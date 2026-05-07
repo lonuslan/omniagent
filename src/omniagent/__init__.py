@@ -6,4 +6,5 @@ to collaborate on complex tasks — from software development to video productio
 """
 
 __version__ = "0.1.0"
+__version_info__ = (0, 1, 0)
 __author__ = "OmniAgent Team"
