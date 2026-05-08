@@ -21,7 +21,8 @@ from omniagent.agents.builtin.generators import (
     TestAgent,
 )
 from omniagent.collaboration.bus import CollaborationBus, ConversationManager
-from omniagent.core.orchestrator import Orchestrator, TaskAnalyzer
+from omniagent.core.orchestrator import Orchestrator
+from omniagent.core.analyzer import TaskAnalyzer
 from omniagent.core.registry import AgentRegistry
 from omniagent.core.workflow import SoftwareLifecycleWorkflow
 from omniagent.protocol import AgentCapability, SubTask, Task, TaskStatus

@@ -23,7 +23,8 @@ from ..agents.builtin.generators import (
     GeneralAgent,
     TestAgent,
 )
-from ..core.orchestrator import Orchestrator, TaskAnalyzer
+from ..core.orchestrator import Orchestrator
+from ..core.analyzer import TaskAnalyzer
 from ..core.registry import AgentRegistry
 from ..core.workflow import SoftwareLifecycleWorkflow
 from ..protocol import Task

@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 
-from omniagent.core.orchestrator import TaskAnalyzer
+from omniagent.core.analyzer import TaskAnalyzer
 from omniagent.core.workflow import VideoProductionWorkflow
 from omniagent.protocol import Task, TaskStatus
 
