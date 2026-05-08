@@ -264,7 +264,7 @@ async function switchMode(mode) {
   document.getElementById('md-icon').textContent = icons[mode];
   document.getElementById('md-label').textContent = labels[mode];
   document.getElementById('sb-mode-text').textContent = texts[mode];
-  try{await pywebview.api.set_mode(mode)}catch(e){}
+  try{await pywebview.api.set_mode(mode)}catch(e){console.error(e);}
 }
 
 // ── Tabs ──
@@ -296,7 +296,7 @@ async function loadModels() {
         <div id="result-${m.id}"></div>
       </div>
     `).join('');
-  }catch(e){}
+  }catch(e){document.getElementById('model-list').innerHTML='<div style="padding:12px;color:var(--err);font-size:11px">加载失败: '+e.message+'</div>';}
 }
 
 async function selectModel(id){
@@ -359,7 +359,7 @@ function startPolling(){
           else if(e.action==='demo_complete'){stopPolling('完成');refreshAudit()}
         }
       }
-    }catch(e){}
+    }catch(e){console.error(e);}
   },200)
 }
 function stopPolling(msg){if(pollTimer){clearInterval(pollTimer);pollTimer=null}updateStatus(msg||'完成',false);document.getElementById('btn-send').disabled=false;isRunning=false;document.querySelectorAll('.ar-dot.running').forEach(d=>d.classList.remove('running'))}
@@ -379,7 +379,7 @@ async function refreshAudit(){
   try{const log=JSON.parse(await pywebview.api.get_audit_log());const el=document.getElementById('audit-list');
     if(!log.length){el.innerHTML='<div style="padding:12px;text-align:center;color:var(--text3);font-size:11px">暂无审计记录</div>';return}
     el.innerHTML=log.map(l=>`<div class="audit-item${l.error?' error':''}"><span class="ai-time">${new Date(l.time*1000).toLocaleTimeString('zh-CN',{hour12:false})}</span> <span class="ai-tool">${l.tool}</span> → ${l.result.slice(0,60)} <span style="color:var(--text3)">(${l.duration_ms}ms)</span></div>`).join('')
-  }catch(e){}
+  }catch(e){console.error(e);}
 }
 
 function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML}
@@ -403,16 +403,20 @@ async function loadTools(){
         <div style="font-size:9px;color:var(--text3);margin-top:2px">${cats[t.category]||t.category}</div>
       </div>
     `).join('');
-  }catch(e){}
+  }catch(e){console.error(e);}
 }
 
 async function refreshLLMStatus(){
   try{const s=JSON.parse(await pywebview.api.get_llm_status());
     document.getElementById('sb-llm-status').textContent = s.configured ? '🔌 LLM 已连接' : '🔌 LLM 未配置';
-  }catch(e){}
+  }catch(e){console.error(e);}
 }
 // Init
-loadModels();loadTools();updateStatus('就绪',false);refreshLLMStatus();
+function initPanels(){
+  loadModels();loadTools();updateStatus('就绪',false);refreshLLMStatus();
+}
+setTimeout(initPanels, 300);
+document.addEventListener('DOMContentLoaded', initPanels);
 </script>
 </body>
 </html>
