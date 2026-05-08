@@ -2,7 +2,8 @@
 CLI entry point for OmniAgent Studio.
 
 Provides commands for:
-  - omniagent tui    : Launch the TUI dashboard (default)
+  - omniagent gui    : Launch the Windows desktop application (default)
+  - omniagent tui    : Launch the TUI terminal dashboard
   - omniagent run    : Run a task from the command line
   - omniagent agent  : Manage agents (list, install, create)
   - omniagent market : Search the agent marketplace
@@ -21,6 +22,16 @@ app = typer.Typer(
     name="omniagent",
     help="OmniAgent Studio - Autonomous Multi-Agent Collaborative Platform",
 )
+
+# ── GUI ──────────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def gui() -> None:
+    """Launch the OmniAgent Studio Windows desktop application."""
+    from .gui.app import launch_gui
+    launch_gui()
+
 
 # ── TUI ──────────────────────────────────────────────────────────────────────
 
@@ -41,17 +52,13 @@ def tui(
 
 @app.command()
 def start(
-    tui_mode: bool = typer.Option(True, help="Launch TUI mode"),
+    gui_mode: bool = typer.Option(True, help="Launch GUI desktop mode"),
     port: int = typer.Option(7860, help="Port for the web UI"),
-    headless: bool = typer.Option(False, help="Run without UI"),
 ) -> None:
-    """Launch OmniAgent Studio."""
-    if tui_mode:
-        from .tui.demo import main as tui_main
-        tui_main()
-    elif headless:
-        typer.echo("Starting OmniAgent in headless mode...")
-        asyncio.run(_run_headless())
+    """Launch OmniAgent Studio (GUI desktop by default)."""
+    if gui_mode:
+        from .gui.app import launch_gui
+        launch_gui()
     else:
         typer.echo(f"Starting OmniAgent Studio on http://localhost:{port}")
         typer.echo("(Web UI: planned for Electron + React)")
@@ -141,11 +148,6 @@ async def _execute_task(task: Task) -> None:
 
     for event in events:
         typer.echo(f"  [{event.agent_id}] {event.event_type}: {event.data}")
-
-
-async def _run_headless() -> None:
-    """Run in headless mode for API/CLI usage."""
-    typer.echo("OmniAgent headless mode active. Waiting for tasks...")
 
 
 def _register_builtins(registry: AgentRegistry) -> None:
