@@ -30,3 +30,6 @@ workspace/
 # Node (future UI)
 node_modules/
 .ui-dist/
+
+# Planning docs
+DEVELOPMENT_PLAN.md

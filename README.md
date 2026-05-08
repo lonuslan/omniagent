@@ -6,7 +6,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Status: Pre-Alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)]()
+[![Tests](https://img.shields.io/badge/tests-41%20passed-success.svg)]()
 
 *一个 Agent 做一件事，一百个 Agent 协作完成一个项目*
 
@@ -16,7 +16,7 @@
 
 ## 这是什么？
 
-**OmniAgent Studio** 是一个全新的多 Agent 协同工作平台。它的核心理念是：
+**OmniAgent Studio** 是一个全新的多 Agent 协同工作平台。核心理念：
 
 > 当你提出一个需求时，系统自动分析任务、分解为子任务、选择最合适的 Agent 去执行每个部分，最终把结果聚合呈现给你。
 
@@ -32,12 +32,13 @@
 | Agent 选择 | 手动指定 | **自动分析 + 能力匹配评分** |
 | 扩展性 | 插件/扩展 | **三源 Agent 生态（内置/自定义/Marketplace）** |
 | 协作方式 | 无 | **消息总线 + Handoff 协议 + Request/Response** |
+| 界面 | CLI/TUI | **Windows 桌面应用 + TUI** |
 
 ---
 
 ## 核心能力
 
-### 🧠 自主任务编排
+### 自主任务编排
 
 ```
 用户: "帮我开发一个电商网站"
@@ -46,7 +47,7 @@ Orchestrator 自动分析:
   ├─ 领域识别: software → 使用 software_lifecycle 工作流
   ├─ 任务分解:
   │   ├─ [需求确认] → GeneralAgent
-  │   ├─ [需求分析] → DocWriterAgent + GeneralAgent
+  │   ├─ [需求分析] → DocWriterAgent
   │   ├─ [原型设计] → CodeGenAgent (UI focus)
   │   ├─ [前端开发] → CodeGenAgent (React/TypeScript)
   │   ├─ [后端开发] → CodeGenAgent (Python/FastAPI)
@@ -55,111 +56,66 @@ Orchestrator 自动分析:
   └─ 按依赖顺序并行/串行执行
 ```
 
-### 🌐 跨领域通用
+### 跨领域通用
 
 同一套编排引擎，适用于完全不同的领域：
 
-| 领域 | Workflow 阶段 | 涉及 Agent |
-|------|--------------|-----------|
-| 🖥️ 软件开发 | 需求→分析→原型→前端→后端→测试→部署 | CodeGen, Review, Test, Doc |
-| 🎬 视频制作 | 脚本→素材→剪辑→音频→转场→审阅→导出 | Video, Audio, Copywriting |
-| 📝 文档写作 | 大纲→初稿→审阅→定稿 | Documentation, Copywriting |
-| 📊 数据分析 | 采集→清洗→分析→可视化 | DataAnalysis, Visualization |
+| 领域 | Workflow 阶段 | 涉及能力 |
+|------|--------------|----------|
+| 软件开发 | 需求→分析→原型→前端→后端→测试→部署 | CodeGen, Review, Test, Doc |
+| 视频制作 | 脚本→素材→剪辑→音频→转场→审阅→导出 | Video, Audio, Copywriting |
+| 文档写作 | 大纲→初稿→审阅→定稿 | Documentation, Copywriting |
+| 数据分析 | 采集→清洗→分析→可视化 | DataAnalysis |
 
-### 🔌 三源 Agent 生态
+### 三源 Agent 生态
 
 ```
 builtin (内置)          custom (自定义)         marketplace (社区)
     │                       │                       │
-    ├─ GeneralAgent         ├─ 通过 CLI 创建        ├─ GitHub Agent 仓库
-    ├─ CodeGenAgent         ├─ 通过 UI Builder      ├─ Community Hub
-    ├─ CodeReviewAgent      ├─ Python SDK 继承      ├─ Enterprise Catalog
+    ├─ GeneralAgent         ├─ CLI 创建             ├─ GitHub Agent 仓库
+    ├─ CodeGenAgent         ├─ UI Builder           ├─ Community Hub
+    ├─ CodeReviewAgent      ├─ Python SDK           ├─ Enterprise Catalog
     ├─ DocWriterAgent       └─ 声明式配置            └─ 一行命令安装
     └─ TestAgent
-```
-
-### 🛠️ 完整的工具系统
-
-类似 Claude Code 的工具框架，任何 Agent 都可以使用：
-
-- **文件操作**: Read, Write, Edit, Glob, Grep
-- **Shell 执行**: 运行命令、脚本
-- **Web 访问**: Fetch, Search
-- **Agent 管理**: Spawn sub-agent, Handoff task
-
----
-
-## 快速开始
-
-### 安装
-
-```bash
-git clone https://github.com/your-org/omniagent.git
-cd omniagent
-pip install -e ".[dev]"
-```
-
-### 运行 Demo
-
-```bash
-# 软件开发全流程 Demo
-python examples/demo_software_project.py
-
-# 视频制作全流程 Demo
-python examples/demo_video_production.py
-```
-
-### CLI 使用
-
-```bash
-# 列出所有可用 Agent
-omniagent agent list
-
-# 运行一个任务
-omniagent run "Build a REST API for a blog platform"
-
-# 搜索 Marketplace
-omniagent market search "video editing agent"
-```
-
-### 运行测试
-
-```bash
-pytest tests/ -v
 ```
 
 ---
 
 ## 系统架构
 
-详细架构请参阅 [ARCHITECTURE.md](ARCHITECTURE.md)
-
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    OmniAgent Studio                       │
 ├─────────────────────────────────────────────────────────┤
-│  CLI / Desktop UI / Web Dashboard                        │
+│  GUI (pywebview) │ TUI (textual) │ CLI (typer)          │
 ├─────────────────────────────────────────────────────────┤
 │  Orchestrator (任务分析 → 能力匹配 → Agent分配)           │
 ├─────────────────────────────────────────────────────────┤
-│  Registry │ Workflow Engine │ Collaboration Bus │ Tools  │
+│  Registry │ Workflow Engine │ Collaboration Bus          │
 ├─────────────────────────────────────────────────────────┤
-│  Agent Runtime (沙箱隔离 │ LLM 模型池 │ 工具执行)         │
+│  Agent Runtime (沙箱隔离 │ LLM 连接池 │ 工具执行)         │
 ├─────────────────────────────────────────────────────────┤
-│  Builtin Agents │ Custom Agents │ Marketplace Agents     │
+│  Security (Plan/Agent/Auto 三种权限模式)                  │
+├─────────────────────────────────────────────────────────┤
+│  LLM Providers (MiMo │ DeepSeek │ Claude │ OpenAI)      │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ### 核心模块
 
-| 模块 | 文件 | 职责 |
+| 模块 | 路径 | 职责 |
 |------|------|------|
-| **Protocol** | `protocol.py` | 核心类型、消息格式、Agent 协议 |
-| **Registry** | `core/registry.py` | Agent 注册、发现、能力匹配评分 |
+| **Protocol** | `protocol.py` | 核心类型系统、Agent/Task/Message/Event 定义 |
+| **Registry** | `core/registry.py` | Agent 注册、发现、能力匹配评分算法 |
 | **Orchestrator** | `core/orchestrator.py` | 任务分析、分解、Agent 选择、执行协调 |
 | **Workflow** | `core/workflow.py` | 多阶段工作流模板（软件/视频/文档） |
 | **Collaboration** | `collaboration/bus.py` | Agent 间消息总线、Handoff 协议 |
-| **Tools** | `tools/base.py` | 声明式工具框架，兼容 Function Calling |
+| **Runtime** | `runtime/` | Agent 沙箱、LLM 连接池、工具执行器、事件流 |
+| **Security** | `runtime/security.py` | Plan/Agent/Auto 三种执行模式 + 工作区策略 |
+| **LLM** | `llm/` | 统一 Provider 层（MiMo/DeepSeek/Claude/OpenAI） |
+| **Tools** | `tools/` | 声明式工具框架，兼容 Function Calling |
+| **GUI** | `gui/` | Windows 桌面应用（pywebview + HTML/CSS） |
+| **TUI** | `tui/` | 终端仪表盘（textual 框架） |
 
 ### 内置 Agent
 
@@ -173,41 +129,150 @@ pytest tests/ -v
 
 ---
 
-## 路线图
+## 快速开始
 
-- [x] **Phase 1: Foundation** — 核心协议、Registry、Orchestrator、Workflow、Collaboration Bus、Tool System
-- [ ] **Phase 2: Runtime** — Agent 沙箱执行、LLM Provider 接入、真实 Agent 运行
-- [ ] **Phase 3: Platform** — Desktop UI (Electron)、Agent Builder、Workflow Builder
-- [ ] **Phase 4: Ecosystem** — Marketplace 服务、Agent 分享安装、社区治理
+### 环境要求
+
+- Python 3.11+
+- Windows 10+ (GUI 需要 WebView2)
+
+### 安装
+
+```bash
+git clone https://github.com/your-org/omniagent.git
+cd omniagent
+pip install -e ".[dev]"
+```
+
+### 启动
+
+```bash
+# Windows 桌面应用（推荐）
+omniagent gui
+
+# 终端仪表盘
+omniagent tui
+
+# 命令行执行
+omniagent run "Build a REST API for a blog platform"
+
+# 查看所有 Agent
+omniagent agent list
+```
+
+### 运行测试
+
+```bash
+pytest tests/ -v
+# 41 tests passed
+```
+
+### 运行 Demo
+
+```bash
+python examples/demo_software_project.py   # 软件开发全流程
+python examples/demo_video_production.py    # 视频制作全流程
+```
 
 ---
 
-## 项目意义
+## 项目结构
 
-OmniAgent Studio 探索的是 **AI Agent 协作的下一阶段**：
-
-1. **从单 Agent 到多 Agent**：单个 Agent 的能力有限，真正的复杂项目需要多个 Agent 各司其职
-2. **从人工编排到自主编排**：不再需要手动指定"用这个 Agent 做 X"，系统自动分析并选择
-3. **从垂直工具到通用平台**：不仅限于编程，任何可以分解为阶段流程的创造性工作都能受益
-4. **从封闭到开放生态**：Agent 和 Skill 可以来自社区，可发现、可安装、可组合
-
-这是一个长期项目，将随着 AI 模型能力的提升而不断进化。
+```
+omniagent/
+├── src/omniagent/
+│   ├── protocol.py              # 核心类型和协议定义
+│   ├── cli.py                   # CLI 入口
+│   ├── core/
+│   │   ├── registry.py          # Agent 注册中心 + 能力匹配
+│   │   ├── orchestrator.py      # 任务编排器
+│   │   └── workflow.py          # 工作流引擎
+│   ├── runtime/
+│   │   ├── sandbox.py           # Agent 沙箱环境
+│   │   ├── pool.py              # LLM 连接池
+│   │   ├── executor.py          # 工具执行引擎
+│   │   ├── stream.py            # 事件流
+│   │   └── security.py          # 权限系统
+│   ├── agents/
+│   │   ├── base.py              # Agent 基类
+│   │   └── builtin/             # 内置 Agent
+│   ├── llm/
+│   │   ├── provider.py          # LLM Provider 抽象
+│   │   ├── types.py             # 统一类型
+│   │   └── providers/           # 各平台实现
+│   ├── tools/
+│   │   ├── base.py              # Tool 框架
+│   │   └── builtin/             # 内置工具
+│   ├── collaboration/
+│   │   └── bus.py               # 协作消息总线
+│   ├── gui/
+│   │   ├── app.py               # GUI 应用
+│   │   └── assets/              # 前端资源
+│   └── tui/
+│       ├── app.py               # TUI 应用
+│       ├── demo.py              # TUI 演示
+│       └── widgets/             # TUI 组件
+├── examples/                    # 示例演示
+├── tests/                       # 测试（41 个）
+├── pyproject.toml               # 项目配置
+└── LICENSE                      # MIT
+```
 
 ---
 
-## 贡献
+## GUI 界面
 
-欢迎贡献！请先阅读我们的贡献指南（待完善）。
+```
+┌──────────────────────────────────────────────────────────┐
+│  🎯 OmniAgent Studio                       ⚙️  ─ □ ✕   │
+├────┬──────────────────────────────────┬──────────────────┤
+│ 📁 │  💬 对话区域                      │ 🤖 Agent 状态    │
+│ 🔍 │                                  │                  │
+│ ⟠  │  用户: Build a todo app…         │ ○ Orchestrator   │
+│ 🧩 │  🎯 Orchestrator: 分析中…         │ ○ CodeGen Agent  │
+│    │  ┌──────────────────────┐       │ ○ Review Agent   │
+│    │  │ ✅ 需求确认 → General │       │ ○ Doc Writer     │
+│    │  │ ✅ 需求分析 → Doc     │       │ ○ Test Agent     │
+│    │  │ ⚡ 原型设计 → CodeGen │       │                  │
+│    │  └──────────────────────┘       │                  │
+├────┴──────────────────────────────────┴──────────────────┤
+│  > 描述你的任务…                           🎤 📎 [↑]     │
+├──────────────────────────────────────────────────────────┤
+│  ● 就绪  │  Stage 3/7  │  v0.2.0  │  5 Agents           │
+└──────────────────────────────────────────────────────────┘
+```
 
-- 🐛 Bug 报告：[GitHub Issues](#)
-- 💡 功能建议：[GitHub Discussions](#)
-- 🔧 代码贡献：Fork → Branch → PR
+- **左侧图标栏**：文件浏览、搜索、Git、插件市场（后续开放）
+- **对话式主区域**：任务以聊天消息呈现，Pipeline 以卡片嵌入
+- **右侧 Agent 面板**：实时状态指示灯（idle/running/completed）
+- **底部输入栏**：支持多行输入，Enter 发送
+
+---
+
+## 开发状态
+
+当前版本: **v0.2.0-dev**
+
+| 模块 | 状态 |
+|------|------|
+| Protocol & Types | ✅ 完成 |
+| Agent Registry + Capability Matching | ✅ 完成 |
+| Orchestrator + TaskAnalyzer | ✅ 完成 |
+| Workflow Engine (3 workflows) | ✅ 完成 |
+| Collaboration Bus | ✅ 完成 |
+| LLM Provider Layer (4 providers) | ✅ 完成 |
+| Agent Runtime (sandbox, pool, executor, stream) | ✅ 完成 |
+| Permission System (Plan/Agent/Auto) | ✅ 完成 |
+| GUI Desktop Application | ✅ 完成 |
+| TUI Terminal Dashboard | ✅ 完成 |
+| Parallel Orchestration Engine | 🚧 进行中 |
+| Agent Marketplace | 📋 计划中 |
 
 ---
 
 ## License
 
-MIT License - 详见 [LICENSE](LICENSE)
+MIT License — 详见 [LICENSE](LICENSE)
 
 ---
 
