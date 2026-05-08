@@ -64,6 +64,7 @@ class OmniAgentAPI:
         self._permissions = PermissionHandler(self._mode)
         self._tool_executor: ToolExecutor | None = None
         self._model_configs: dict[str, dict] = {}  # model_id → {api_key, base_url}
+        self._active_model_id: str = ""             # currently selected model
         self._llm_bridge = LLMBridge()
         self._setup_registry()
 
@@ -99,12 +100,25 @@ class OmniAgentAPI:
     # ── Model Config ────────────────────────────────────────────────────
 
     def get_models(self) -> str:
-        """Return built-in model list with saved configs."""
-        return json.dumps([{
-            **m,
-            "configured": m["id"] in self._model_configs,
-            "has_key": bool(self._model_configs.get(m["id"], {}).get("api_key")),
-        } for m in BUILTIN_MODELS])
+        """Return built-in model list with saved configs and active state."""
+        return json.dumps({
+            "models": [{
+                **m,
+                "configured": m["id"] in self._model_configs,
+                "has_key": bool(self._model_configs.get(m["id"], {}).get("api_key")),
+                "active": m["id"] == self._active_model_id,
+            } for m in BUILTIN_MODELS],
+            "active_model": self._active_model_id,
+        })
+
+    def select_model(self, model_id: str) -> str:
+        """Select/activate a model for use in orchestration."""
+        cfg = self._model_configs.get(model_id)
+        if not cfg or not cfg.get("api_key"):
+            return json.dumps({"status": "error", "message": "请先配置 API Key"})
+        self._active_model_id = model_id
+        self._llm_bridge.configure(model_id, cfg["api_key"], cfg.get("base_url", ""))
+        return json.dumps({"status": "ok", "active_model": model_id})
 
     def save_model_config(self, model_id: str, api_key: str, base_url: str = "") -> str:
         cfg = {"api_key": api_key}

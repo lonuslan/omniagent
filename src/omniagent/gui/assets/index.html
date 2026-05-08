@@ -278,27 +278,37 @@ function switchTab(tab) {
 // ── Models ──
 async function loadModels() {
   try{
-    const models = JSON.parse(await pywebview.api.get_models());
+    const data = JSON.parse(await pywebview.api.get_models());
+    const models = data.models; const active = data.active_model;
     const el = document.getElementById('model-list');
     el.innerHTML = models.map(m => `
-      <div class="model-card">
-        <div class="mc-header"><span class="mc-name">${m.name}</span><span class="mc-provider">${m.provider}</span></div>
+      <div class="model-card" id="mcard-${m.id}" style="${m.active?'border-color:var(--accent);box-shadow:0 0 6px rgba(124,138,255,.15)':''}">
+        <div class="mc-header"><span class="mc-name">${m.name}</span><span class="mc-provider">${m.provider}</span>${m.active?'<span style="font-size:10px;color:var(--accent);font-weight:600">⚡ 使用中</span>':''}</div>
         <div class="mc-info"><span>📐 ${m.context}</span><span>💰 ${m.pricing}</span>${m.configured?'<span style="color:var(--success)">✅ 已配置</span>':''}</div>
         <div class="mc-key-row">
           <input type="password" id="key-${m.id}" placeholder="API Key" value="${m.has_key?'••••••••':''}" style="font-family:var(--mono);font-size:10px">
           <button onclick="saveModel('${m.id}')">💾</button>
           <button class="test-btn" onclick="testModel('${m.id}')">🔌 测试</button>
-          <button onclick="usageModel('${m.id}')">📊 用量</button>
+          ${m.configured&&!m.active?`<button style="background:var(--accent);color:#fff;border-color:var(--accent)" onclick="selectModel('${m.id}')">✅ 启用</button>`:''}
+          ${m.active?`<button style="color:var(--success);border-color:var(--success)">⚡ 已启用</button>`:''}
+          <button onclick="usageModel('${m.id}')">📊</button>
         </div>
         <div id="result-${m.id}"></div>
       </div>
     `).join('');
   }catch(e){}
 }
+
+async function selectModel(id){
+  try{const r=JSON.parse(await pywebview.api.select_model(id));
+    if(r.status==='ok'){showResult(id,'模型已激活','ok');loadModels();refreshLLMStatus()}
+    else{showResult(id,r.message,'err')}
+  }catch(e){showResult(id,'激活失败','err')}
+}
 async function saveModel(id){
   const key = document.getElementById('key-'+id).value.trim();
   if(!key){showResult(id,'请输入 API Key','err');return}
-  try{await pywebview.api.save_model_config(id, key, ''); showResult(id,'已保存','ok')}catch(e){showResult(id,'保存失败','err')}
+  try{await pywebview.api.save_model_config(id, key, ''); showResult(id,'已保存，点击"启用"激活模型','ok');loadModels()}catch(e){showResult(id,'保存失败','err')}
 }
 async function testModel(id){
   showResult(id,'测试中…','')
