@@ -5,289 +5,618 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OmniAgent Studio</title>
 <style>
+/* ── Reset & Variables ── */
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg-primary:#0d1117;
-  --bg-secondary:#161b22;
-  --bg-tertiary:#21262d;
-  --border:#30363d;
-  --text-primary:#e6edf3;
-  --text-secondary:#8b949e;
-  --accent:#58a6ff;
-  --success:#3fb950;
-  --warning:#d29922;
-  --error:#f85149;
-  --thinking:#a371f7;
+  --bg-body:#1a1b1e;
+  --bg-sidebar:#1e1f22;
+  --bg-main:#1a1b1e;
+  --bg-card:#222327;
+  --bg-input:#2d2f34;
+  --bg-hover:#2a2b2e;
+  --border:#3a3b3e;
+  --border-light:#4a4b50;
+  --text-primary:#e1e1e3;
+  --text-secondary:#9b9c9e;
+  --text-muted:#6b6c6e;
+  --accent:#7c8aff;
+  --accent-dim:#5b6aef;
+  --success:#4ade80;
+  --warning:#f59e0b;
+  --error:#f87171;
+  --info:#60a5fa;
+  --thinking:#c084fc;
+  --font-sans:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono','Cascadia Code','Fira Code',Consolas,monospace;
 }
 body{
-  font-family:'Segoe UI',system-ui,sans-serif;
-  background:var(--bg-primary);
+  font-family:var(--font-sans);
+  background:var(--bg-body);
   color:var(--text-primary);
   height:100vh;display:flex;flex-direction:column;overflow:hidden;
+  font-size:13px;line-height:1.5;
 }
-header{
-  background:var(--bg-secondary);border-bottom:1px solid var(--border);
-  padding:10px 20px;display:flex;align-items:center;gap:12px;
+
+/* ── Title Bar (draggable) ── */
+#titlebar{
+  background:var(--bg-sidebar);border-bottom:1px solid var(--border);
+  height:36px;display:flex;align-items:center;padding:0 12px;
+  -webkit-app-region:drag;gap:8px;
 }
-header .logo{font-size:18px;font-weight:700}
-header .logo span{color:var(--accent)}
-header .version{font-size:11px;color:var(--text-secondary);background:var(--bg-tertiary);padding:2px 8px;border-radius:10px}
-header .spacer{flex:1}
-header button{
-  background:var(--accent);color:#fff;border:none;padding:8px 20px;
-  border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;
+#titlebar .t-logo{font-weight:700;font-size:13px;color:var(--text-primary)}
+#titlebar .t-logo svg{vertical-align:-2px}
+#titlebar .t-spacer{flex:1}
+#titlebar .t-actions{display:flex;gap:6px;-webkit-app-region:no-drag}
+#titlebar .t-actions button{
+  background:none;border:none;color:var(--text-secondary);cursor:pointer;
+  width:28px;height:28px;border-radius:6px;font-size:14px;transition:.15s;
 }
-header button:hover{opacity:.85}
-header button:disabled{opacity:.4;cursor:default}
-header button.reset-btn{background:var(--bg-tertiary);color:var(--text-primary)}
-main{flex:1;display:flex;overflow:hidden}
-aside{
-  width:220px;min-width:220px;background:var(--bg-secondary);
-  border-right:1px solid var(--border);padding:12px 0;display:flex;flex-direction:column;
+#titlebar .t-actions button:hover{background:var(--bg-hover);color:var(--text-primary)}
+
+/* ── Main Layout ── */
+#app{flex:1;display:flex;overflow:hidden}
+
+/* ── Left Sidebar (Icon Bar + Panel) ── */
+#sidebar-left{
+  width:48px;min-width:48px;background:var(--bg-sidebar);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;
+  align-items:center;padding:8px 0;gap:4px;
 }
-aside.right{border-right:none;border-left:1px solid var(--border);width:320px}
-.section-title{
-  font-size:10px;text-transform:uppercase;letter-spacing:1px;
-  color:var(--text-secondary);padding:8px 16px 4px;
+#sidebar-left .s-icon{
+  width:36px;height:36px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;color:var(--text-secondary);cursor:pointer;
+  font-size:17px;transition:.15s;position:relative;
 }
-.agent-item{
-  padding:8px 16px;font-size:12px;display:flex;align-items:center;gap:8px;
-  border-left:2px solid transparent;transition:all .15s;
+#sidebar-left .s-icon:hover{background:var(--bg-hover);color:var(--text-primary)}
+#sidebar-left .s-icon.active{background:var(--bg-card);color:var(--accent)}
+#sidebar-left .s-icon .tooltip{
+  display:none;position:absolute;left:44px;top:50%;transform:translateY(-50%);
+  background:var(--bg-card);border:1px solid var(--border);padding:4px 10px;
+  border-radius:6px;font-size:11px;white-space:nowrap;z-index:10;
+  pointer-events:none;
 }
-.agent-item:hover{background:var(--bg-tertiary)}
-.agent-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--text-secondary)}
-.agent-dot.running{background:var(--success);animation:pulse .8s infinite}
-.agent-dot.done{background:var(--accent)}
-.agent-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.agent-caps{font-size:10px;color:var(--text-secondary)}
-.center{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.pipeline{flex:1;padding:20px 30px;overflow-y:auto}
-.pipeline h2{font-size:14px;margin-bottom:16px;color:var(--text-secondary)}
-.stages{display:flex;flex-direction:column;gap:6px}
-.stage{
-  display:flex;align-items:center;gap:12px;
-  padding:12px 16px;background:var(--bg-secondary);
-  border:1px solid var(--border);border-radius:8px;transition:all .4s;
+#sidebar-left .s-icon:hover .tooltip{display:block}
+#sidebar-left .s-spacer{flex:1}
+
+/* ── Left Panel (expandable) ── */
+#left-panel{
+  width:260px;background:var(--bg-sidebar);border-right:1px solid var(--border);
+  display:none;flex-direction:column;overflow:hidden;
 }
-.stage.running{border-color:var(--accent);background:#1a2332;box-shadow:0 0 12px rgba(88,166,255,.15)}
-.stage.completed{border-color:var(--success);opacity:.75}
-.stage .stage-icon{font-size:20px;width:32px;text-align:center}
-.stage .stage-status{font-size:16px;width:24px}
-.stage .stage-info{flex:1}
-.stage .stage-name{font-size:13px;font-weight:500}
-.stage .stage-agent{font-size:11px;color:var(--text-secondary)}
-.event-log{flex:1;overflow-y:auto;padding:8px 0}
-.event-item{
-  padding:5px 16px;font-size:11px;font-family:'Cascadia Code',Consolas,monospace;
-  border-bottom:1px solid var(--bg-tertiary);animation:slide .2s;
+#left-panel.open{display:flex}
+#left-panel .panel-header{
+  padding:12px 16px;font-size:11px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.5px;color:var(--text-muted);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
 }
-.event-item .evt-time{color:var(--text-secondary);margin-right:8px}
-.event-item.info{color:var(--text-secondary)}
-.event-item.success{color:var(--success)}
-.event-item.error{color:var(--error)}
-.event-item.thinking{color:var(--thinking)}
-.event-item.system{color:var(--accent);font-weight:600}
-footer{
-  background:var(--bg-secondary);border-top:1px solid var(--border);
-  padding:6px 20px;font-size:11px;color:var(--text-secondary);
-  display:flex;align-items:center;gap:20px;
+#left-panel .panel-content{flex:1;overflow-y:auto;padding:4px}
+.panel-item{
+  padding:6px 12px;font-size:12px;display:flex;align-items:center;gap:8px;
+  border-radius:6px;cursor:pointer;color:var(--text-secondary);transition:.1s;
 }
-footer .dot{width:6px;height:6px;border-radius:50%;background:var(--success)}
+.panel-item:hover{background:var(--bg-hover);color:var(--text-primary)}
+.panel-item .pi-icon{font-size:14px;width:20px;text-align:center}
+.placeholder-text{
+  padding:24px 16px;font-size:12px;color:var(--text-muted);
+  text-align:center;line-height:1.6;
+}
+
+/* ── Main Content ── */
+#main-content{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-body);
+}
+
+/* Conversation area */
+#conversation{
+  flex:1;overflow-y:auto;padding:16px 0;
+}
+.conv-inner{max-width:800px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:20px}
+
+/* Welcome message */
+.welcome{text-align:center;padding:60px 20px 40px}
+.welcome h1{font-size:24px;font-weight:700;margin-bottom:8px}
+.welcome h1 span{color:var(--accent)}
+.welcome p{color:var(--text-secondary);font-size:14px;max-width:500px;margin:0 auto 24px}
+.welcome .quick-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.welcome .qa-btn{
+  background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);
+  padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;
+  transition:.15s;display:flex;align-items:center;gap:6px;
+}
+.welcome .qa-btn:hover{background:var(--bg-hover);border-color:var(--border-light)}
+
+/* Chat messages */
+.msg{display:flex;gap:12px;animation:msgIn .25s}
+.msg-user{flex-direction:row-reverse}
+.msg-avatar{
+  width:30px;height:30px;border-radius:8px;flex-shrink:0;display:flex;
+  align-items:center;justify-content:center;font-size:15px;
+}
+.msg-user .msg-avatar{background:#3a3b5c}
+.msg-assistant .msg-avatar{background:#2d3a2d}
+.msg-orch .msg-avatar{background:#3a2d4a}
+.msg-body{max-width:85%}
+.msg-user .msg-body{text-align:right}
+.msg-sender{font-size:10px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.5px;margin-bottom:4px;color:var(--text-muted)}
+.msg-bubble{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:12px;padding:12px 16px;font-size:13px;line-height:1.6;
+}
+.msg-user .msg-bubble{background:#2d2f3a;border-color:#3a3b5c}
+.msg-bubble code{
+  background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;
+  font-family:var(--font-mono);font-size:12px;
+}
+.msg-bubble pre{
+  background:#1a1b1e;border:1px solid var(--border);border-radius:8px;
+  padding:12px;overflow-x:auto;font-family:var(--font-mono);font-size:11px;
+  margin:8px 0;
+}
+
+/* Pipeline card inside message */
+.pipeline-card{
+  background:#1a1b1e;border:1px solid var(--border);border-radius:10px;
+  padding:8px 0;margin:8px 0;overflow:hidden;
+}
+.pipeline-card .pc-stage{
+  display:flex;align-items:center;gap:10px;padding:6px 14px;
+  font-size:12px;color:var(--text-muted);transition:all .4s;
+}
+.pipeline-card .pc-stage.running{
+  color:var(--text-primary);background:rgba(124,138,255,.08);
+}
+.pipeline-card .pc-stage.completed{color:var(--text-secondary)}
+.pipeline-card .pc-icon{font-size:16px;width:24px;text-align:center}
+.pipeline-card .pc-status{width:20px;font-size:14px}
+.pipeline-card .pc-name{flex:1;font-weight:500}
+.pipeline-card .pc-agent{font-size:11px;color:var(--text-muted)}
+
+/* Status indicators */
+.status-ok{color:var(--success)}
+.status-running{color:var(--warning)}
+.status-done{color:var(--accent)}
+
+/* ── Right Panel (Agents) ── */
+#right-panel{
+  width:280px;min-width:280px;background:var(--bg-sidebar);
+  border-left:1px solid var(--border);display:flex;flex-direction:column;
+}
+#right-panel .panel-header{padding:12px 16px;font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);
+  border-bottom:1px solid var(--border)}
+#right-panel .panel-content{flex:1;overflow-y:auto;padding:8px}
+.agent-card{
+  padding:10px 12px;margin-bottom:4px;border-radius:8px;
+  display:flex;align-items:center;gap:10px;cursor:pointer;transition:.15s;
+}
+.agent-card:hover{background:var(--bg-hover)}
+.agent-card .ac-dot{
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;
+  background:var(--text-muted);
+}
+.agent-card .ac-dot.running{background:var(--success);box-shadow:0 0 6px rgba(74,222,128,.4)}
+.agent-card .ac-info{flex:1;overflow:hidden}
+.agent-card .ac-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-card .ac-caps{font-size:10px;color:var(--text-muted)}
+.agent-card .ac-badge{font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg-card);color:var(--text-muted)}
+
+/* ── Input Bar ── */
+#input-bar{
+  border-top:1px solid var(--border);background:var(--bg-sidebar);padding:12px 16px;
+}
+.input-wrapper{
+  max-width:800px;margin:0 auto;display:flex;gap:8px;
+  background:var(--bg-input);border:1px solid var(--border);
+  border-radius:12px;padding:6px 8px;align-items:flex-end;
+  transition:border-color .2s;
+}
+.input-wrapper:focus-within{border-color:var(--accent-dim)}
+#user-input{
+  flex:1;background:none;border:none;color:var(--text-primary);
+  font-family:var(--font-sans);font-size:13px;resize:none;
+  padding:6px 8px;outline:none;max-height:120px;min-height:24px;
+}
+#user-input::placeholder{color:var(--text-muted)}
+.input-actions{display:flex;gap:4px;align-items:flex-end}
+.input-actions button{
+  background:none;border:none;color:var(--text-muted);cursor:pointer;
+  width:30px;height:30px;border-radius:6px;font-size:15px;transition:.15s;
+  display:flex;align-items:center;justify-content:center;
+}
+.input-actions button:hover{background:var(--bg-hover);color:var(--text-primary)}
+#btn-send{
+  background:var(--accent)!important;color:#fff!important;
+  border-radius:8px!important;width:32px!important;height:32px!important;
+}
+#btn-send:hover{background:var(--accent-dim)!important}
+#btn-send:disabled{opacity:.4;cursor:default}
+
+/* ── Status Bar ── */
+#statusbar{
+  background:var(--bg-sidebar);border-top:1px solid var(--border);
+  height:28px;display:flex;align-items:center;padding:0 12px;
+  font-size:11px;color:var(--text-muted);gap:16px;
+}
+#statusbar .sb-item{display:flex;align-items:center;gap:4px}
+#statusbar .sb-dot{width:7px;height:7px;border-radius:50%;background:var(--success)}
+#statusbar .sb-dot.busy{background:var(--warning);animation:pulse 1s infinite}
+#statusbar .sb-spacer{flex:1}
+
+/* ── Animations ── */
+@keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-@keyframes slide{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--border-light)}
 </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">🎯 <span>OmniAgent</span> Studio</div>
-  <div class="version">v0.2.0</div>
-  <div class="spacer"></div>
-  <button id="btn-run" onclick="runDemo()">▶ 运行 Demo</button>
-  <button class="reset-btn" onclick="resetAll()">↺ 重置</button>
-</header>
+<!-- Title Bar -->
+<div id="titlebar">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+       style="color:var(--accent)"><circle cx="12" cy="12" r="3"/><circle cx="4" cy="12" r="2"/><circle cx="20" cy="6" r="2"/><circle cx="20" cy="18" r="2"/><line x1="7" y1="12" x2="10" y2="12"/><line x1="15" y1="12" x2="18" y2="7"/><line x1="15" y1="12" x2="18" y2="17"/></svg>
+  <span class="t-logo">OmniAgent <span style="color:var(--accent);font-weight:500">Studio</span></span>
+  <span class="t-spacer"></span>
+  <div class="t-actions">
+    <button title="设置" id="btn-settings">⚙️</button>
+    <button title="全屏">⛶</button>
+  </div>
+</div>
 
-<main>
-  <aside id="agents-panel">
-    <div class="section-title">🤖 Agent 列表</div>
-    <div id="agent-list"></div>
-  </aside>
+<!-- App Body -->
+<div id="app">
 
-  <div class="center">
-    <div class="pipeline">
-      <h2>🔄 Task Pipeline</h2>
-      <div class="stages" id="pipeline-stages">
-        <div class="stage" id="stage-0"><div class="stage-status">⬜</div><div class="stage-icon">📋</div><div class="stage-info"><div class="stage-name">需求确认</div><div class="stage-agent" id="stage-agent-0"></div></div></div>
-        <div class="stage" id="stage-1"><div class="stage-status">⬜</div><div class="stage-icon">🔬</div><div class="stage-info"><div class="stage-name">需求分析</div><div class="stage-agent" id="stage-agent-1"></div></div></div>
-        <div class="stage" id="stage-2"><div class="stage-status">⬜</div><div class="stage-icon">🎨</div><div class="stage-info"><div class="stage-name">原型设计</div><div class="stage-agent" id="stage-agent-2"></div></div></div>
-        <div class="stage" id="stage-3"><div class="stage-status">⬜</div><div class="stage-icon">💻</div><div class="stage-info"><div class="stage-name">前端开发</div><div class="stage-agent" id="stage-agent-3"></div></div></div>
-        <div class="stage" id="stage-4"><div class="stage-status">⬜</div><div class="stage-icon">⚙️</div><div class="stage-info"><div class="stage-name">后端开发</div><div class="stage-agent" id="stage-agent-4"></div></div></div>
-        <div class="stage" id="stage-5"><div class="stage-status">⬜</div><div class="stage-icon">🧪</div><div class="stage-info"><div class="stage-name">测试</div><div class="stage-agent" id="stage-agent-5"></div></div></div>
-        <div class="stage" id="stage-6"><div class="stage-status">⬜</div><div class="stage-icon">🚀</div><div class="stage-info"><div class="stage-name">部署上线</div><div class="stage-agent" id="stage-agent-6"></div></div></div>
+  <!-- Left Icon Bar -->
+  <div id="sidebar-left">
+    <div class="s-icon active" data-panel="files" title="文件浏览">
+      📁<span class="tooltip">文件 (未来)</span>
+    </div>
+    <div class="s-icon" data-panel="search" title="搜索">
+      🔍<span class="tooltip">搜索 (未来)</span>
+    </div>
+    <div class="s-icon" data-panel="git" title="版本管理">
+      ⟠<span class="tooltip">Git (未来)</span>
+    </div>
+    <div class="s-icon" data-panel="extensions" title="插件市场">
+      🧩<span class="tooltip">插件市场 (未来)</span>
+    </div>
+    <div class="s-spacer"></div>
+    <div class="s-icon" title="帮助">
+      ❔<span class="tooltip">帮助</span>
+    </div>
+  </div>
+
+  <!-- Left Panel (expandable - placeholder for future features) -->
+  <div id="left-panel">
+    <div class="panel-header">
+      <span id="left-panel-title">文件浏览</span>
+      <span style="cursor:pointer;font-size:14px" onclick="toggleLeftPanel()">✕</span>
+    </div>
+    <div class="panel-content" id="left-panel-content">
+      <div class="placeholder-text">
+        🚧 此功能将在后续版本中开放<br>
+        <span style="color:var(--text-muted)">文件树、搜索、Git 管理</span>
       </div>
     </div>
   </div>
 
-  <aside class="right">
-    <div class="section-title">📋 事件日志</div>
-    <div class="event-log" id="event-log"></div>
-  </aside>
-</main>
-
-<footer>
-  <div class="dot" id="status-dot"></div>
-  <span id="status-text">就绪</span>
-  <span style="flex:1"></span>
-  <span id="progress-text"></span>
-</footer>
-
-<script>
-const MAX_EVENTS = 150;
-let pollTimer = null;
-let eventCount = 0;
-
-// ── Init ──
-async function initAgents() {
-  try {
-    const raw = await pywebview.api.get_agents();
-    const agents = JSON.parse(raw);
-    const el = document.getElementById('agent-list');
-    el.innerHTML = agents.map(a => `
-      <div class="agent-item" id="agent-${a.id}">
-        <div class="agent-dot idle"></div>
-        <div class="agent-info">
-          <div class="agent-name">${a.name}</div>
-          <div class="agent-caps">${(a.capabilities||[]).slice(0,2).join(', ')}</div>
+  <!-- Main Content -->
+  <div id="main-content">
+    <div id="conversation">
+      <div class="conv-inner" id="conv-inner">
+        <!-- Welcome -->
+        <div class="welcome" id="welcome-msg">
+          <h1>🎯 <span>OmniAgent</span> Studio</h1>
+          <p>自主多Agent协同平台 — 输入你的任务，AI 自动分解并调度最优 Agent 协作完成</p>
+          <div class="quick-actions">
+            <button class="qa-btn" onclick="submitTask('Build a full-stack todo app with React + FastAPI')">
+              💻 软件开发全流程
+            </button>
+            <button class="qa-btn" onclick="submitTask('Create a 3-minute product launch video')">
+              🎬 视频制作流程
+            </button>
+            <button class="qa-btn" onclick="submitTask('Write a technical design document for a microservice architecture')">
+              📝 文档写作流程
+            </button>
+          </div>
         </div>
       </div>
-    `).join('');
-  } catch(e) {
-    console.error('Failed to load agents:', e);
-  }
-}
-initAgents();
+    </div>
 
-// ── Demo ──
-async function runDemo() {
-  const btn = document.getElementById('btn-run');
-  btn.disabled = true;
-  btn.textContent = '⏳ 运行中...';
-  updateStatus('运行中', 'running');
-  resetPipeline();
+    <!-- Input Bar -->
+    <div id="input-bar">
+      <div class="input-wrapper">
+        <textarea id="user-input" placeholder="描述你的任务，Orchestrator 将自动调度 Agent 协作完成…" rows="1"
+                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitTask(this.value)}"></textarea>
+        <div class="input-actions">
+          <button title="语音输入 (未来)" disabled>🎤</button>
+          <button title="附加文件 (未来)" disabled>📎</button>
+          <button id="btn-send" onclick="submitTask(document.getElementById('user-input').value)">↑</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel (Agents) -->
+  <div id="right-panel">
+    <div class="panel-header">
+      <span>🤖 Agent 状态</span>
+      <span style="font-size:10px;color:var(--text-muted)">5 已注册</span>
+    </div>
+    <div class="panel-content" id="agents-container">
+      <div class="agent-card" id="ac-orchestrator">
+        <div class="ac-dot" id="ac-dot-orchestrator"></div>
+        <div class="ac-info">
+          <div class="ac-name">🎯 Orchestrator</div>
+          <div class="ac-caps">任务分析 · Agent 调度</div>
+        </div>
+        <div class="ac-badge">core</div>
+      </div>
+      <div class="agent-card" id="ac-general-agent">
+        <div class="ac-dot" id="ac-dot-general-agent"></div>
+        <div class="ac-info">
+          <div class="ac-name">🤖 General Agent</div>
+          <div class="ac-caps">通用任务处理</div>
+        </div>
+        <div class="ac-badge">builtin</div>
+      </div>
+      <div class="agent-card" id="ac-code-gen-agent">
+        <div class="ac-dot" id="ac-dot-code-gen-agent"></div>
+        <div class="ac-info">
+          <div class="ac-name">💻 CodeGen Agent</div>
+          <div class="ac-caps">代码生成 · UI 设计</div>
+        </div>
+        <div class="ac-badge">builtin</div>
+      </div>
+      <div class="agent-card" id="ac-code-review-agent">
+        <div class="ac-dot" id="ac-dot-code-review-agent"></div>
+        <div class="ac-info">
+          <div class="ac-name">🔍 Review Agent</div>
+          <div class="ac-caps">代码审查 · 测试</div>
+        </div>
+        <div class="ac-badge">builtin</div>
+      </div>
+      <div class="agent-card" id="ac-doc-writer-agent">
+        <div class="ac-dot" id="ac-dot-doc-writer-agent"></div>
+        <div class="ac-info">
+          <div class="ac-name">📝 Doc Writer</div>
+          <div class="ac-caps">文档 · 文案</div>
+        </div>
+        <div class="ac-badge">builtin</div>
+      </div>
+      <div class="agent-card" id="ac-test-agent">
+        <div class="ac-dot" id="ac-dot-test-agent"></div>
+        <div class="ac-info">
+          <div class="ac-name">🧪 Test Agent</div>
+          <div class="ac-caps">单元测试 · E2E</div>
+        </div>
+        <div class="ac-badge">builtin</div>
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);padding:8px">
+      <div style="font-size:10px;color:var(--text-muted);text-align:center;padding:4px">
+        🚧 自定义 Agent · Marketplace (即将推出)
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Status Bar -->
+<div id="statusbar">
+  <div class="sb-item"><div class="sb-dot" id="sb-dot"></div><span id="sb-status">就绪</span></div>
+  <div class="sb-spacer"></div>
+  <div class="sb-item" id="sb-progress"></div>
+  <div class="sb-spacer"></div>
+  <div class="sb-item">v0.2.0-dev</div>
+  <div class="sb-item">5 Agents</div>
+</div>
+
+<script>
+// ── State ──
+let pollTimer = null;
+let isRunning = false;
+const MAX_EVENTS_DISPLAY = 30;
+
+// ── Left Panel Toggle ──
+document.querySelectorAll('#sidebar-left .s-icon[data-panel]').forEach(icon => {
+  icon.addEventListener('click', function() {
+    if (this.classList.contains('active')) {
+      this.classList.remove('active');
+      document.getElementById('left-panel').classList.remove('open');
+    } else {
+      document.querySelectorAll('#sidebar-left .s-icon').forEach(i => i.classList.remove('active'));
+      this.classList.add('active');
+      const panel = document.getElementById('left-panel');
+      panel.classList.add('open');
+      document.getElementById('left-panel-title').textContent =
+        this.querySelector('.tooltip')?.textContent || '面板';
+    }
+  });
+});
+
+function toggleLeftPanel() {
+  document.getElementById('left-panel').classList.remove('open');
+  document.querySelectorAll('#sidebar-left .s-icon').forEach(i => i.classList.remove('active'));
+}
+
+// ── Submit Task ──
+async function submitTask(text) {
+  if (!text || !text.trim() || isRunning) return;
+  document.getElementById('user-input').value = '';
+  document.getElementById('welcome-msg')?.remove();
+
+  // Add user message
+  addMessage('user', '👤', 'YOU', text.trim());
+  updateStatus('分析中…', true);
+  document.getElementById('btn-send').disabled = true;
 
   try {
-    await pywebview.api.run_demo();
-    startPolling();
+    const result = JSON.parse(await pywebview.api.run_demo());
+    if (result.status === 'started') {
+      addMessage('orch', '🎯', 'ORCHESTRATOR', '任务已接收，正在分析…');
+      startPolling();
+    }
   } catch(e) {
-    addEvent('system', 'Error: ' + e.message, 'error');
-    btn.disabled = false;
-    btn.textContent = '▶ 运行 Demo';
+    addMessage('orch', '🎯', 'ORCHESTRATOR', '错误: ' + e.message);
+    updateStatus('就绪', false);
+    document.getElementById('btn-send').disabled = false;
   }
 }
 
-// ── Polling ──
+// ── Messages ──
+function addMessage(type, avatar, sender, text) {
+  const el = document.getElementById('conv-inner');
+  const div = document.createElement('div');
+  div.className = 'msg msg-' + (type === 'user' ? 'user' : 'assistant');
+  div.innerHTML = `
+    <div class="msg-avatar">${avatar}</div>
+    <div class="msg-body">
+      <div class="msg-sender">${sender}</div>
+      <div class="msg-bubble">${escapeHtml(text)}</div>
+    </div>
+  `;
+  el.appendChild(div);
+  document.getElementById('conversation').scrollTop = document.getElementById('conversation').scrollHeight;
+  return div;
+}
+
+function addPipelineCard(stages) {
+  const el = document.getElementById('conv-inner');
+  const div = document.createElement('div');
+  div.className = 'msg msg-assistant';
+  const stageHtml = stages.map((s, i) => `
+    <div class="pc-stage" id="pc-stage-${i}">
+      <span class="pc-status">⬜</span>
+      <span class="pc-icon">${s.emoji}</span>
+      <span class="pc-name">${s.name}</span>
+      <span class="pc-agent" id="pc-agent-${i}"></span>
+    </div>
+  `).join('');
+  div.innerHTML = `
+    <div class="msg-avatar">🔄</div>
+    <div class="msg-body" style="flex:1;max-width:100%">
+      <div class="msg-sender">PIPELINE</div>
+      <div class="msg-bubble" style="padding:0">
+        <div class="pipeline-card">${stageHtml}</div>
+      </div>
+    </div>
+  `;
+  el.appendChild(div);
+  document.getElementById('conversation').scrollTop = document.getElementById('conversation').scrollHeight;
+  return div;
+}
+
+// ── Event polling ──
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
+  let eventBuffer = [];
+  let pipelineCardAdded = false;
+
   pollTimer = setInterval(async () => {
     try {
       const raw = await pywebview.api.poll_events();
       const events = JSON.parse(raw);
       for (const evt of events) {
         if (evt.type === 'event') {
-          addEvent(evt.source, evt.message, evt.level);
+          eventBuffer.push(evt);
         } else if (evt.type === 'action') {
-          handleAction(evt);
+          if (evt.action === 'init_pipeline' && !pipelineCardAdded) {
+            pipelineCardAdded = true;
+            const stages = [
+              {name:'需求确认',emoji:'📋'},{name:'需求分析',emoji:'🔬'},
+              {name:'原型设计',emoji:'🎨'},{name:'前端开发',emoji:'💻'},
+              {name:'后端开发',emoji:'⚙️'},{name:'测试',emoji:'🧪'},
+              {name:'部署上线',emoji:'🚀'}
+            ];
+            addPipelineCard(stages.slice(0, evt.count));
+          } else if (evt.action === 'stage_update') {
+            updateStageCard(evt.index, evt.status, evt.agent);
+            updateAgentDot(evt.agent, evt.status);
+          } else if (evt.action === 'demo_complete') {
+            stopPolling('完成');
+          }
         }
       }
-      const status = JSON.parse(await pywebview.api.get_status());
-      if (!status.running) stopPolling();
+      // Flush buffered events in batches (avoid too many messages)
+      if (eventBuffer.length > 0) {
+        const last = eventBuffer[eventBuffer.length - 1];
+        addEventSummary(eventBuffer);
+        eventBuffer = [];
+      }
     } catch(e) {}
   }, 200);
 }
 
-function stopPolling() {
+function stopPolling(msg) {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
-  document.getElementById('btn-run').disabled = false;
-  document.getElementById('btn-run').textContent = '▶ 运行 Demo';
-  updateStatus('完成', 'idle');
+  updateStatus(msg || '完成', false);
+  document.getElementById('btn-send').disabled = false;
+  isRunning = false;
+  document.querySelectorAll('.ac-dot.running').forEach(d => d.classList.remove('running'));
 }
 
-// ── Actions ──
-function handleAction(evt) {
-  if (evt.action === 'stage_update') {
-    setStage(evt.index, evt.status, evt.agent || '');
-    if (evt.agent) setAgentStatus(evt.agent, evt.status);
-  } else if (evt.action === 'demo_complete') {
-    stopPolling();
+function addEventSummary(events) {
+  if (events.length === 0) return;
+  const last = events[events.length - 1];
+  // Only show significant events as messages
+  if (last.level === 'success' || last.level === 'system' || events.length > 3) {
+    const icon = last.source.startsWith('code-') ? '💻' :
+                 last.source.startsWith('test') ? '🧪' :
+                 last.source.startsWith('doc-') ? '📝' : '🎯';
+    addMessage('orch', icon, last.source.toUpperCase(), '✅ ' + last.message);
   }
 }
 
 // ── UI Updates ──
-function addEvent(source, message, level) {
-  const el = document.getElementById('event-log');
-  const now = new Date().toLocaleTimeString('zh-CN', {hour12:false});
-  const icons = {
-    system:'⚙️', orchestrator:'🎯', info:'ℹ️', success:'✅',
-    warning:'⚠️', error:'❌', thinking:'🧠',
-    'code-gen-agent':'💻', 'code-review-agent':'🔍',
-    'doc-writer-agent':'📝', 'test-agent':'🧪', 'general-agent':'🤖'
-  };
-  const icon = icons[source] || icons[level] || '•';
-  const div = document.createElement('div');
-  div.className = 'event-item ' + level;
-  div.innerHTML = `<span class="evt-time">${now}</span>${icon} ${message}`;
-  el.appendChild(div);
-  el.scrollTop = el.scrollHeight;
-  if (++eventCount > MAX_EVENTS) el.firstChild?.remove();
-  updateProgress();
-}
-
-function setStage(index, status, agent) {
-  const stage = document.getElementById('stage-' + index);
+function updateStageCard(index, status, agent) {
+  const stage = document.getElementById('pc-stage-' + index);
   if (!stage) return;
-  stage.className = 'stage ' + status;
+  stage.className = 'pc-stage ' + status;
   const icons = {pending:'⬜', running:'⚡', completed:'✅', failed:'❌'};
-  const statusEl = stage.querySelector('.stage-status');
+  const statusEl = stage.querySelector('.pc-status');
   if (statusEl) statusEl.textContent = icons[status] || '⬜';
-  const agentEl = document.getElementById('stage-agent-' + index);
-  if (agentEl && agent) agentEl.textContent = '→ ' + agent.replace('Agent','').trim();
+  const agentEl = document.getElementById('pc-agent-' + index);
+  if (agentEl && agent) agentEl.textContent = '→ ' + agent.replace('Agent','').replace('-',' ').trim();
+
+  // Progress in status bar
+  const done = document.querySelectorAll('.pc-stage.completed').length;
+  document.getElementById('sb-progress').textContent = done ? `Stage ${Math.min(done+1,7)}/7` : '';
 }
 
-function setAgentStatus(id, status) {
-  const el = document.getElementById('agent-' + id);
-  if (!el) return;
-  el.querySelector('.agent-dot').className = 'agent-dot ' + status;
+function updateAgentDot(agentId, status) {
+  const dot = document.getElementById('ac-dot-' + agentId);
+  if (dot) {
+    dot.className = 'ac-dot' + (status === 'running' ? ' running' : '');
+  }
 }
 
-function updateProgress() {
-  const done = document.querySelectorAll('.stage.completed').length;
-  const total = 7;
-  document.getElementById('progress-text').textContent = done ? `Stage ${Math.min(done+1,total)}/${total}` : '';
+function updateStatus(text, busy) {
+  document.getElementById('sb-status').textContent = text;
+  const dot = document.getElementById('sb-dot');
+  dot.className = busy ? 'sb-dot busy' : 'sb-dot';
 }
 
-function updateStatus(text, type) {
-  document.getElementById('status-text').textContent = text;
-  const dot = document.getElementById('status-dot');
-  dot.style.background = type === 'running' ? 'var(--warning)' : 'var(--success)';
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
-function resetPipeline() {
-  document.getElementById('event-log').innerHTML = '';
-  eventCount = 0;
-  document.querySelectorAll('.stage').forEach(s => { s.className = 'stage'; });
-  document.querySelectorAll('.stage-status').forEach(s => { s.textContent = '⬜'; });
-  document.querySelectorAll('.stage-agent').forEach(s => { s.textContent = ''; });
-  document.querySelectorAll('.agent-dot').forEach(d => { d.className = 'agent-dot idle'; });
-  document.getElementById('progress-text').textContent = '';
-  updateStatus('就绪', 'idle');
-}
+// Auto-resize input
+document.getElementById('user-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
 
-function resetAll() {
-  stopPolling();
-  resetPipeline();
-  document.getElementById('btn-run').disabled = false;
-  document.getElementById('btn-run').textContent = '▶ 运行 Demo';
-}
+// Init
+updateStatus('就绪', false);
 </script>
 </body>
 </html>
