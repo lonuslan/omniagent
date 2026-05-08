@@ -1,14 +1,14 @@
 """
 OmniAgent Studio — Windows Desktop Application.
 
-Uses pywebview to create a native Windows window with a modern
-HTML/CSS/JS dashboard backed by the Python orchestrator engine.
+Uses pywebview for native Windows window + WebView2 rendering.
+Background demo thread → event queue → JS polling → UI updates.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
+import queue
 import threading
 import time
 import uuid
@@ -30,235 +30,163 @@ from ..protocol import Task
 
 
 class OmniAgentAPI:
-    """
-    JS ↔ Python bridge exposed to the webview frontend.
-
-    The frontend calls these methods via:  window.pywebview.api.methodName()
-    """
+    """JS ↔ Python bridge. All methods are called from the webview UI thread."""
 
     def __init__(self) -> None:
-        self._window: webview.Window | None = None
         self._registry: AgentRegistry | None = None
         self._orchestrator: Orchestrator | None = None
         self._running = False
+        self._events: queue.Queue = queue.Queue()
         self._setup_registry()
-
-    def set_window(self, window: webview.Window) -> None:
-        self._window = window
 
     def _setup_registry(self) -> None:
         registry = AgentRegistry()
-        for cls in [
-            GeneralAgent,
-            CodeGenAgent,
-            CodeReviewAgent,
-            DocWriterAgent,
-            TestAgent,
-        ]:
+        for cls in [GeneralAgent, CodeGenAgent, CodeReviewAgent, DocWriterAgent, TestAgent]:
             temp = cls()
             registry.register(temp.descriptor, cls)
         self._registry = registry
         self._orchestrator = Orchestrator(registry)
 
-    # ── API Methods (called from JS) ────────────────────────────────────
+    # ── API called from JS ──────────────────────────────────────────────
 
     def get_agents(self) -> str:
-        """Return all registered agents as JSON."""
         if not self._registry:
             return "[]"
         agents = []
         for desc in self._registry.list_all():
-            agents.append(
-                {
-                    "id": desc.id,
-                    "name": desc.name,
-                    "capabilities": [c.value for c in desc.capabilities],
-                    "role": desc.role.value,
-                    "provider": desc.provider,
-                }
-            )
+            agents.append({
+                "id": desc.id,
+                "name": desc.name,
+                "capabilities": [c.value for c in desc.capabilities],
+                "role": desc.role.value,
+            })
         return json.dumps(agents)
 
-    def get_workflows(self) -> str:
-        """Return available workflow templates."""
-        workflows = [
-            {
-                "name": "software_lifecycle",
-                "description": "Full software development lifecycle",
-                "stages": [
-                    {"name": "需求确认", "emoji": "📋", "capabilities": ["general_purpose"]},
-                    {"name": "需求分析", "emoji": "🔬", "capabilities": ["architecture_design"]},
-                    {"name": "原型设计", "emoji": "🎨", "capabilities": ["ui_design"]},
-                    {"name": "前端开发", "emoji": "💻", "capabilities": ["code_generation"]},
-                    {"name": "后端开发", "emoji": "⚙️", "capabilities": ["code_generation"]},
-                    {"name": "测试", "emoji": "🧪", "capabilities": ["testing"]},
-                    {"name": "部署上线", "emoji": "🚀", "capabilities": ["deployment"]},
-                ],
-            },
-            {
-                "name": "video_production",
-                "description": "End-to-end video production pipeline",
-                "stages": [
-                    {"name": "文案脚本", "emoji": "📝", "capabilities": ["copywriting"]},
-                    {"name": "素材准备", "emoji": "📦", "capabilities": ["general_purpose"]},
-                    {"name": "视频剪辑", "emoji": "✂️", "capabilities": ["video_editing"]},
-                    {"name": "音频制作", "emoji": "🎵", "capabilities": ["audio_production"]},
-                    {"name": "转场特效", "emoji": "✨", "capabilities": ["video_editing"]},
-                    {"name": "审阅修改", "emoji": "👀", "capabilities": ["general_purpose"]},
-                    {"name": "导出发布", "emoji": "🚀", "capabilities": ["video_editing"]},
-                ],
-            },
-        ]
-        return json.dumps(workflows)
-
     def run_demo(self) -> str:
-        """Start the orchestration demo. Returns initial task info."""
         if self._running:
-            return json.dumps({"status": "error", "message": "Demo already running"})
-
+            return json.dumps({"status": "error", "message": "Already running"})
         self._running = True
-        threading.Thread(target=self._run_demo_thread, daemon=True).start()
-        return json.dumps({"status": "started", "message": "Demo started"})
+        self._events = queue.Queue()
+        threading.Thread(target=self._demo_thread, daemon=True).start()
+        return json.dumps({"status": "started"})
+
+    def poll_events(self) -> str:
+        """Called by JS every ~200ms. Returns all queued events as JSON array."""
+        events = []
+        while True:
+            try:
+                events.append(self._events.get_nowait())
+            except queue.Empty:
+                break
+        return json.dumps(events)
 
     def get_status(self) -> str:
         return json.dumps({"running": self._running})
 
-    # ── Demo Logic (runs in background thread) ────────────────────────
+    # ── Event helpers (called from demo thread) ─────────────────────────
 
-    def _run_demo_thread(self) -> None:
-        """Run the orchestration demo and push events to the frontend."""
+    def _emit(self, source: str, message: str, level: str = "info") -> None:
+        self._events.put({"type": "event", "source": source, "message": message, "level": level})
+
+    def _action(self, action: str, **kwargs) -> None:
+        self._events.put({"type": "action", "action": action, **kwargs})
+
+    # ── Demo thread ─────────────────────────────────────────────────────
+
+    def _demo_thread(self) -> None:
         try:
-            self._emit_event("system", "Initializing OmniAgent orchestrator...", "system")
-            time.sleep(0.4)
-
-            if not self._registry or not self._orchestrator:
-                self._running = False
-                return
-
-            # Register agents
-            agents_info = []
-            for desc in self._registry.list_all():
-                caps = ", ".join(c.value for c in desc.capabilities[:2])
-                agents_info.append(f"{desc.name} [{caps}]")
-                self._emit_event("system", f"Registered: {desc.name} [{caps}]", "info")
-                time.sleep(0.15)
-
-            self._emit_event("system", f"Orchestrator ready. {len(agents_info)} agents.", "success")
-            time.sleep(0.5)
-
-            # Task analysis
-            task = Task(
-                id=str(uuid.uuid4()),
-                title="Build a Full-Stack Todo App",
-                description="React + FastAPI + PostgreSQL",
-                domain="software",
-                workflow_template="software_lifecycle",
-            )
-
-            self._emit_event("orchestrator", "Task received: Build a Full-Stack Todo App", "info")
-            time.sleep(0.3)
-
-            analyzer = TaskAnalyzer()
-            analysis = analyzer.analyze(task)
-
-            self._emit_event("orchestrator", "🔬 Analyzing task...", "thinking")
-            time.sleep(0.5)
-            self._emit_event(
-                "orchestrator",
-                f"Domain: {analysis['domain']} | Workflow: {analysis['suggested_workflow']}",
-                "info",
-            )
-            time.sleep(0.3)
-
-            # Decomposition
-            self._emit_event("orchestrator", "🔄 Decomposing into stages...", "thinking")
-            time.sleep(0.5)
-
-            workflow = SoftwareLifecycleWorkflow()
-            sub_tasks = workflow.generate_sub_tasks(task)
-
-            self._emit_event(
-                "orchestrator",
-                f"Decomposed into {len(sub_tasks)} stages",
-                "success",
-            )
-
-            # Initialize pipeline in frontend
-            self._js(f"initPipeline({len(sub_tasks)})")
-            time.sleep(0.3)
-
-            # Agent assignment
-            agent_map = {
-                0: "general-agent",
-                1: "doc-writer-agent",
-                2: "code-gen-agent",
-                3: "code-gen-agent",
-                4: "code-gen-agent",
-                5: "test-agent",
-                6: "general-agent",
-            }
-
-            stage_names = [s.name for s in workflow.stages]
-            for i, st in enumerate(sub_tasks):
-                best_id = agent_map.get(i, "general-agent")
-                best = self._registry.get(best_id)
-                if best:
-                    st.assigned_agent = best.id
-                    self._emit_event(
-                        "orchestrator",
-                        f"Stage {i + 1} '{stage_names[i]}' → {best.name}",
-                        "info",
-                    )
-                    time.sleep(0.12)
-
-            self._emit_event("system", "All stages assigned. Starting execution.", "success")
-            time.sleep(0.3)
-
-            # Execute stages
-            self._emit_event("system", "⚡ Pipeline execution started", "system")
-
-            outputs = [
-                "Analyzed project scope and feature requirements",
-                "Generated technical specification document",
-                "Designed UI wireframes and component tree",
-                "Created React components with TypeScript types",
-                "Built FastAPI endpoints with PostgreSQL schema",
-                "Wrote test suites — 24 unit tests, 8 integration tests",
-                "Generated Docker deployment configurations",
-            ]
-
-            for i, st in enumerate(sub_tasks):
-                agent_id = st.assigned_agent or "general-agent"
-                self._js(f"setAgentStatus('{agent_id}', 'running')")
-                self._js(f"setStageStatus({i}, 'running', '{agent_id}')")
-
-                self._emit_event(agent_id, f"Starting: {stage_names[i]}", "thinking")
-                time.sleep(1.0)  # Simulate work
-
-                self._emit_event(agent_id, outputs[i], "success")
-                self._js(f"setStageStatus({i}, 'completed')")
-                self._js(f"setAgentStatus('{agent_id}', 'idle')")
-                time.sleep(0.3)
-
-            # Done
-            self._emit_event("system", "🎉 Project completed! 7/7 stages done.", "success")
-            self._emit_event("system", "Agents involved: 4 | All tests passing", "system")
-            self._js_eval("demoComplete()")
-
+            self._run_demo()
         except Exception as e:
-            self._emit_event("system", f"Error: {e}", "error")
+            self._emit("system", f"Error: {e}", "error")
         finally:
             self._running = False
+            self._action("demo_complete")
 
-    def _emit_event(self, source: str, message: str, level: str) -> None:
-        """Push an event to the frontend via JS evaluation."""
-        escaped = message.replace("\\", "\\\\").replace("'", "\\'")
-        self._js_eval(f"addEvent('{source}', '{escaped}', '{level}')")
+    def _run_demo(self) -> None:
+        self._emit("system", "Initializing OmniAgent orchestrator...", "system")
+        time.sleep(0.3)
 
-    def _js_eval(self, code: str) -> None:
-        """Execute JS in the webview window, if available."""
-        if self._window:
-            self._window.evaluate_js(code)
+        if not self._registry:
+            return
+
+        for desc in self._registry.list_all():
+            caps = ", ".join(c.value for c in desc.capabilities[:2])
+            self._emit("system", f"Registered: {desc.name} [{caps}]", "info")
+            time.sleep(0.1)
+
+        self._emit("system", "Orchestrator ready. 5 agents.", "success")
+        time.sleep(0.4)
+
+        # Task analysis
+        self._emit("orchestrator", "Task received: Build a Full-Stack Todo App", "info")
+        time.sleep(0.3)
+
+        task = Task(
+            id=str(uuid.uuid4()),
+            title="Build a Full-Stack Todo App",
+            description="React + FastAPI + PostgreSQL",
+            domain="software",
+            workflow_template="software_lifecycle",
+        )
+
+        analyzer = TaskAnalyzer()
+        analysis = analyzer.analyze(task)
+
+        self._emit("orchestrator", "Analyzing task...", "thinking")
+        time.sleep(0.5)
+        self._emit("orchestrator", f"Domain: {analysis['domain']} | Workflow: software_lifecycle", "info")
+
+        # Decomposition
+        self._emit("orchestrator", "Decomposing into stages...", "thinking")
+        time.sleep(0.4)
+
+        workflow = SoftwareLifecycleWorkflow()
+        sub_tasks = workflow.generate_sub_tasks(task)
+        self._emit("orchestrator", f"Decomposed into {len(sub_tasks)} stages", "success")
+
+        self._action("init_pipeline", count=len(sub_tasks))
+        time.sleep(0.3)
+
+        # Agent assignment
+        agent_map = {0: "general-agent", 1: "doc-writer-agent", 2: "code-gen-agent",
+                     3: "code-gen-agent", 4: "code-gen-agent", 5: "test-agent", 6: "general-agent"}
+        stage_names = [s.name for s in workflow.stages]
+
+        for i, st in enumerate(sub_tasks):
+            best_id = agent_map.get(i, "general-agent")
+            best = self._registry.get(best_id)
+            if best:
+                st.assigned_agent = best.id
+                self._emit("orchestrator", f"Stage {i+1} '{stage_names[i]}' → {best.name}", "info")
+                time.sleep(0.1)
+
+        self._emit("system", "All stages assigned. Starting execution.", "success")
+        time.sleep(0.3)
+        self._emit("system", "Pipeline execution started", "system")
+
+        outputs = [
+            "Analyzed project scope and feature requirements",
+            "Generated technical specification document",
+            "Designed UI wireframes and component tree",
+            "Created React components with TypeScript types",
+            "Built FastAPI endpoints with PostgreSQL schema",
+            "Wrote test suites — 24 unit tests, 8 integration tests",
+            "Generated Docker deployment configurations",
+        ]
+
+        for i, st in enumerate(sub_tasks):
+            agent_id = st.assigned_agent or "general-agent"
+            self._action("stage_update", index=i, status="running", agent=agent_id)
+
+            self._emit(agent_id, f"Starting: {stage_names[i]}", "thinking")
+            time.sleep(1.0)
+
+            self._emit(agent_id, outputs[i], "success")
+            self._action("stage_update", index=i, status="completed")
+            time.sleep(0.2)
+
+        self._emit("system", "Project completed! 7/7 stages done.", "success")
+        self._emit("system", "Agents involved: 4 | All tests passing", "system")
 
 
 def get_assets_dir() -> Path:
@@ -266,18 +194,15 @@ def get_assets_dir() -> Path:
 
 
 def launch_gui() -> None:
-    """Launch the OmniAgent Studio desktop window."""
-
     assets = get_assets_dir()
     html_path = assets / "index.html"
-
     if not html_path.exists():
         raise FileNotFoundError(f"GUI assets not found at {html_path}")
 
     html_content = html_path.read_text(encoding="utf-8")
-
     api = OmniAgentAPI()
-    window = webview.create_window(
+
+    webview.create_window(
         title="OmniAgent Studio — Multi-Agent Orchestration",
         html=html_content,
         js_api=api,
@@ -285,8 +210,6 @@ def launch_gui() -> None:
         height=860,
         min_size=(960, 600),
         resizable=True,
-        easy_drag=False,
     )
-    api.set_window(window)
 
     webview.start(debug=False, http_server=True)

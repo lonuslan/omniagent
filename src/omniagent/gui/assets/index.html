@@ -23,149 +23,78 @@ body{
   font-family:'Segoe UI',system-ui,sans-serif;
   background:var(--bg-primary);
   color:var(--text-primary);
-  height:100vh;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-  user-select:none;
+  height:100vh;display:flex;flex-direction:column;overflow:hidden;
 }
-/* Header */
 header{
-  background:var(--bg-secondary);
-  border-bottom:1px solid var(--border);
-  padding:10px 20px;
-  display:flex;
-  align-items:center;
-  gap:12px;
-  -webkit-app-region:drag;
+  background:var(--bg-secondary);border-bottom:1px solid var(--border);
+  padding:10px 20px;display:flex;align-items:center;gap:12px;
 }
-header .logo{font-size:18px;font-weight:700;letter-spacing:-0.5px}
+header .logo{font-size:18px;font-weight:700}
 header .logo span{color:var(--accent)}
 header .version{font-size:11px;color:var(--text-secondary);background:var(--bg-tertiary);padding:2px 8px;border-radius:10px}
 header .spacer{flex:1}
 header button{
-  -webkit-app-region:no-drag;
-  background:var(--accent);
-  color:#fff;
-  border:none;
-  padding:8px 20px;
-  border-radius:6px;
-  font-size:13px;
-  font-weight:600;
-  cursor:pointer;
-  transition:opacity .2s;
+  background:var(--accent);color:#fff;border:none;padding:8px 20px;
+  border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;
 }
 header button:hover{opacity:.85}
 header button:disabled{opacity:.4;cursor:default}
-/* Layout */
-main{
-  flex:1;
-  display:flex;
-  overflow:hidden;
-}
-/* Sidebar */
+header button.reset-btn{background:var(--bg-tertiary);color:var(--text-primary)}
+main{flex:1;display:flex;overflow:hidden}
 aside{
-  width:220px;
-  min-width:220px;
-  background:var(--bg-secondary);
-  border-right:1px solid var(--border);
-  display:flex;flex-direction:column;
-  padding:12px 0;
+  width:220px;min-width:220px;background:var(--bg-secondary);
+  border-right:1px solid var(--border);padding:12px 0;display:flex;flex-direction:column;
 }
-aside .section-title{
-  font-size:10px;
-  text-transform:uppercase;
-  letter-spacing:1px;
-  color:var(--text-secondary);
-  padding:8px 16px 4px;
+aside.right{border-right:none;border-left:1px solid var(--border);width:320px}
+.section-title{
+  font-size:10px;text-transform:uppercase;letter-spacing:1px;
+  color:var(--text-secondary);padding:8px 16px 4px;
 }
-aside .agent-item{
-  padding:8px 16px;
-  font-size:12px;
-  cursor:pointer;
-  display:flex;align-items:center;gap:8px;
-  border-left:2px solid transparent;
-  transition:all .15s;
+.agent-item{
+  padding:8px 16px;font-size:12px;display:flex;align-items:center;gap:8px;
+  border-left:2px solid transparent;transition:all .15s;
 }
-aside .agent-item:hover{background:var(--bg-tertiary)}
-aside .agent-item.active{border-left-color:var(--accent);background:var(--bg-tertiary)}
-aside .agent-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-aside .agent-dot.idle{background:var(--text-secondary)}
-aside .agent-dot.running{background:var(--success);animation:pulse .8s infinite}
-aside .agent-dot.done{background:var(--accent)}
-aside .agent-info{overflow:hidden}
-aside .agent-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-aside .agent-caps{font-size:10px;color:var(--text-secondary)}
-/* Center */
-.center{
-  flex:1;
-  display:flex;flex-direction:column;
-  overflow:hidden;
-}
-/* Pipeline */
-.pipeline{
-  flex:1;
-  padding:20px 30px;
-  overflow-y:auto;
-}
+.agent-item:hover{background:var(--bg-tertiary)}
+.agent-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--text-secondary)}
+.agent-dot.running{background:var(--success);animation:pulse .8s infinite}
+.agent-dot.done{background:var(--accent)}
+.agent-name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-caps{font-size:10px;color:var(--text-secondary)}
+.center{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.pipeline{flex:1;padding:20px 30px;overflow-y:auto}
 .pipeline h2{font-size:14px;margin-bottom:16px;color:var(--text-secondary)}
 .stages{display:flex;flex-direction:column;gap:6px}
 .stage{
   display:flex;align-items:center;gap:12px;
-  padding:12px 16px;
-  background:var(--bg-secondary);
-  border:1px solid var(--border);
-  border-radius:8px;
-  transition:all .3s;
+  padding:12px 16px;background:var(--bg-secondary);
+  border:1px solid var(--border);border-radius:8px;transition:all .4s;
 }
-.stage.running{border-color:var(--accent);background:#1a2332}
-.stage.completed{border-color:var(--success);opacity:.8}
+.stage.running{border-color:var(--accent);background:#1a2332;box-shadow:0 0 12px rgba(88,166,255,.15)}
+.stage.completed{border-color:var(--success);opacity:.75}
 .stage .stage-icon{font-size:20px;width:32px;text-align:center}
 .stage .stage-status{font-size:16px;width:24px}
 .stage .stage-info{flex:1}
 .stage .stage-name{font-size:13px;font-weight:500}
 .stage .stage-agent{font-size:11px;color:var(--text-secondary)}
-.stage .stage-connector{
-  width:2px;height:8px;background:var(--border);
-  position:absolute;left:32px;bottom:-8px;
-}
-/* Right panel */
-aside.right{
-  width:320px;
-  border-right:none;
-  border-left:1px solid var(--border);
-}
-.event-log{
-  flex:1;
-  overflow-y:auto;
-  padding:8px 0;
-}
+.event-log{flex:1;overflow-y:auto;padding:8px 0}
 .event-item{
-  padding:5px 16px;
-  font-size:11px;
-  font-family:'Cascadia Code',Consolas,monospace;
-  border-bottom:1px solid transparent;
-  animation:slideIn .2s;
+  padding:5px 16px;font-size:11px;font-family:'Cascadia Code',Consolas,monospace;
+  border-bottom:1px solid var(--bg-tertiary);animation:slide .2s;
 }
 .event-item .evt-time{color:var(--text-secondary);margin-right:8px}
-.event-item .evt-icon{margin-right:6px}
 .event-item.info{color:var(--text-secondary)}
 .event-item.success{color:var(--success)}
 .event-item.error{color:var(--error)}
 .event-item.thinking{color:var(--thinking)}
 .event-item.system{color:var(--accent);font-weight:600}
-/* Footer */
 footer{
-  background:var(--bg-secondary);
-  border-top:1px solid var(--border);
-  padding:6px 20px;
-  font-size:11px;
-  color:var(--text-secondary);
+  background:var(--bg-secondary);border-top:1px solid var(--border);
+  padding:6px 20px;font-size:11px;color:var(--text-secondary);
   display:flex;align-items:center;gap:20px;
 }
-footer .status-dot{width:6px;height:6px;border-radius:50%;background:var(--success)}
+footer .dot{width:6px;height:6px;border-radius:50%;background:var(--success)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-@keyframes slideIn{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+@keyframes slide{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
 </style>
 </head>
 <body>
@@ -175,25 +104,30 @@ footer .status-dot{width:6px;height:6px;border-radius:50%;background:var(--succe
   <div class="version">v0.2.0</div>
   <div class="spacer"></div>
   <button id="btn-run" onclick="runDemo()">▶ 运行 Demo</button>
-  <button id="btn-reset" onclick="resetAll()" style="background:var(--bg-tertiary);color:var(--text-primary)">↺ 重置</button>
+  <button class="reset-btn" onclick="resetAll()">↺ 重置</button>
 </header>
 
 <main>
-  <!-- Left: Agent List -->
   <aside id="agents-panel">
-    <div class="section-title">🤖 已注册 Agent</div>
+    <div class="section-title">🤖 Agent 列表</div>
     <div id="agent-list"></div>
   </aside>
 
-  <!-- Center: Pipeline -->
   <div class="center">
     <div class="pipeline">
       <h2>🔄 Task Pipeline</h2>
-      <div class="stages" id="pipeline-stages"></div>
+      <div class="stages" id="pipeline-stages">
+        <div class="stage" id="stage-0"><div class="stage-status">⬜</div><div class="stage-icon">📋</div><div class="stage-info"><div class="stage-name">需求确认</div><div class="stage-agent" id="stage-agent-0"></div></div></div>
+        <div class="stage" id="stage-1"><div class="stage-status">⬜</div><div class="stage-icon">🔬</div><div class="stage-info"><div class="stage-name">需求分析</div><div class="stage-agent" id="stage-agent-1"></div></div></div>
+        <div class="stage" id="stage-2"><div class="stage-status">⬜</div><div class="stage-icon">🎨</div><div class="stage-info"><div class="stage-name">原型设计</div><div class="stage-agent" id="stage-agent-2"></div></div></div>
+        <div class="stage" id="stage-3"><div class="stage-status">⬜</div><div class="stage-icon">💻</div><div class="stage-info"><div class="stage-name">前端开发</div><div class="stage-agent" id="stage-agent-3"></div></div></div>
+        <div class="stage" id="stage-4"><div class="stage-status">⬜</div><div class="stage-icon">⚙️</div><div class="stage-info"><div class="stage-name">后端开发</div><div class="stage-agent" id="stage-agent-4"></div></div></div>
+        <div class="stage" id="stage-5"><div class="stage-status">⬜</div><div class="stage-icon">🧪</div><div class="stage-info"><div class="stage-name">测试</div><div class="stage-agent" id="stage-agent-5"></div></div></div>
+        <div class="stage" id="stage-6"><div class="stage-status">⬜</div><div class="stage-icon">🚀</div><div class="stage-info"><div class="stage-name">部署上线</div><div class="stage-agent" id="stage-agent-6"></div></div></div>
+      </div>
     </div>
   </div>
 
-  <!-- Right: Event Stream -->
   <aside class="right">
     <div class="section-title">📋 事件日志</div>
     <div class="event-log" id="event-log"></div>
@@ -201,91 +135,94 @@ footer .status-dot{width:6px;height:6px;border-radius:50%;background:var(--succe
 </main>
 
 <footer>
-  <div class="status-dot" id="status-dot"></div>
+  <div class="dot" id="status-dot"></div>
   <span id="status-text">就绪</span>
   <span style="flex:1"></span>
   <span id="progress-text"></span>
 </footer>
 
 <script>
-// ── State ──
-let agentData = [];
+const MAX_EVENTS = 150;
+let pollTimer = null;
 let eventCount = 0;
-const MAX_EVENTS = 200;
 
 // ── Init ──
-async function init() {
+async function initAgents() {
   try {
-    const raw = await window.pywebview.api.get_agents();
-    agentData = JSON.parse(raw);
-    renderAgents(agentData);
+    const raw = await pywebview.api.get_agents();
+    const agents = JSON.parse(raw);
+    const el = document.getElementById('agent-list');
+    el.innerHTML = agents.map(a => `
+      <div class="agent-item" id="agent-${a.id}">
+        <div class="agent-dot idle"></div>
+        <div class="agent-info">
+          <div class="agent-name">${a.name}</div>
+          <div class="agent-caps">${(a.capabilities||[]).slice(0,2).join(', ')}</div>
+        </div>
+      </div>
+    `).join('');
   } catch(e) {
-    document.getElementById('agent-list').innerHTML = '<div style="padding:16px;font-size:12px;color:var(--text-secondary)">Agents will appear here</div>';
+    console.error('Failed to load agents:', e);
   }
-  updateStatus('就绪', 'idle');
 }
-init();
+initAgents();
 
-// ── Agents ──
-function renderAgents(agents) {
-  const el = document.getElementById('agent-list');
-  el.innerHTML = agents.map(a => `
-    <div class="agent-item" id="agent-${a.id}">
-      <div class="agent-dot idle"></div>
-      <div class="agent-info">
-        <div class="agent-name">${a.name}</div>
-        <div class="agent-caps">${(a.capabilities||[]).slice(0,2).join(', ')}</div>
-      </div>
-    </div>
-  `).join('');
-}
+// ── Demo ──
+async function runDemo() {
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true;
+  btn.textContent = '⏳ 运行中...';
+  updateStatus('运行中', 'running');
+  resetPipeline();
 
-function setAgentStatus(id, status) {
-  const el = document.getElementById('agent-' + id);
-  if (!el) return;
-  const dot = el.querySelector('.agent-dot');
-  dot.className = 'agent-dot ' + status;
-}
-
-// ── Pipeline ──
-const stageData = [
-  {name:'需求确认', emoji:'📋'},
-  {name:'需求分析', emoji:'🔬'},
-  {name:'原型设计', emoji:'🎨'},
-  {name:'前端开发', emoji:'💻'},
-  {name:'后端开发', emoji:'⚙️'},
-  {name:'测试', emoji:'🧪'},
-  {name:'部署上线', emoji:'🚀'},
-];
-
-function initPipeline(count) {
-  const el = document.getElementById('pipeline-stages');
-  el.innerHTML = stageData.slice(0, count).map((s, i) => `
-    <div class="stage" id="stage-${i}">
-      <div class="stage-status" id="stage-status-${i}">⬜</div>
-      <div class="stage-icon">${s.emoji}</div>
-      <div class="stage-info">
-        <div class="stage-name">${s.name}</div>
-        <div class="stage-agent" id="stage-agent-${i}"></div>
-      </div>
-    </div>
-  `).join('');
-}
-
-function setStageStatus(index, status, agent) {
-  const stage = document.getElementById('stage-' + index);
-  if (!stage) return;
-  stage.className = 'stage ' + status;
-  const icons = {pending:'⬜', running:'⚡', completed:'✅', failed:'❌'};
-  const statusEl = document.getElementById('stage-status-' + index);
-  if (statusEl) statusEl.textContent = icons[status] || '⬜';
-  if (agent) {
-    const agentEl = document.getElementById('stage-agent-' + index);
-    if (agentEl) agentEl.textContent = '→ ' + agent;
+  try {
+    await pywebview.api.run_demo();
+    startPolling();
+  } catch(e) {
+    addEvent('system', 'Error: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '▶ 运行 Demo';
   }
 }
 
-// ── Events ──
+// ── Polling ──
+function startPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(async () => {
+    try {
+      const raw = await pywebview.api.poll_events();
+      const events = JSON.parse(raw);
+      for (const evt of events) {
+        if (evt.type === 'event') {
+          addEvent(evt.source, evt.message, evt.level);
+        } else if (evt.type === 'action') {
+          handleAction(evt);
+        }
+      }
+      const status = JSON.parse(await pywebview.api.get_status());
+      if (!status.running) stopPolling();
+    } catch(e) {}
+  }, 200);
+}
+
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  document.getElementById('btn-run').disabled = false;
+  document.getElementById('btn-run').textContent = '▶ 运行 Demo';
+  updateStatus('完成', 'idle');
+}
+
+// ── Actions ──
+function handleAction(evt) {
+  if (evt.action === 'stage_update') {
+    setStage(evt.index, evt.status, evt.agent || '');
+    if (evt.agent) setAgentStatus(evt.agent, evt.status);
+  } else if (evt.action === 'demo_complete') {
+    stopPolling();
+  }
+}
+
+// ── UI Updates ──
 function addEvent(source, message, level) {
   const el = document.getElementById('event-log');
   const now = new Date().toLocaleTimeString('zh-CN', {hour12:false});
@@ -298,67 +235,59 @@ function addEvent(source, message, level) {
   const icon = icons[source] || icons[level] || '•';
   const div = document.createElement('div');
   div.className = 'event-item ' + level;
-  div.innerHTML = `<span class="evt-time">${now}</span><span class="evt-icon">${icon}</span>${message}`;
+  div.innerHTML = `<span class="evt-time">${now}</span>${icon} ${message}`;
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
-  eventCount++;
-  if (eventCount > MAX_EVENTS) el.firstChild?.remove();
+  if (++eventCount > MAX_EVENTS) el.firstChild?.remove();
   updateProgress();
+}
+
+function setStage(index, status, agent) {
+  const stage = document.getElementById('stage-' + index);
+  if (!stage) return;
+  stage.className = 'stage ' + status;
+  const icons = {pending:'⬜', running:'⚡', completed:'✅', failed:'❌'};
+  const statusEl = stage.querySelector('.stage-status');
+  if (statusEl) statusEl.textContent = icons[status] || '⬜';
+  const agentEl = document.getElementById('stage-agent-' + index);
+  if (agentEl && agent) agentEl.textContent = '→ ' + agent.replace('Agent','').trim();
+}
+
+function setAgentStatus(id, status) {
+  const el = document.getElementById('agent-' + id);
+  if (!el) return;
+  el.querySelector('.agent-dot').className = 'agent-dot ' + status;
 }
 
 function updateProgress() {
   const done = document.querySelectorAll('.stage.completed').length;
-  const total = document.querySelectorAll('.stage').length || 7;
-  document.getElementById('progress-text').textContent = total ? `Stage ${Math.min(done+1, total)}/${total}` : '';
+  const total = 7;
+  document.getElementById('progress-text').textContent = done ? `Stage ${Math.min(done+1,total)}/${total}` : '';
 }
 
 function updateStatus(text, type) {
   document.getElementById('status-text').textContent = text;
   const dot = document.getElementById('status-dot');
   dot.style.background = type === 'running' ? 'var(--warning)' : 'var(--success)';
-  dot.style.animation = type === 'running' ? 'pulse .8s infinite' : 'none';
 }
 
-// ── Actions ──
-async function runDemo() {
-  const btn = document.getElementById('btn-run');
-  btn.disabled = true;
-  btn.textContent = '⏳ 运行中...';
-  updateStatus('运行中', 'running');
-  initPipeline(7);
-  try {
-    await window.pywebview.api.run_demo();
-  } catch(e) {
-    addEvent('system', 'Error: ' + e.message, 'error');
-  }
-}
-
-function demoComplete() {
-  document.getElementById('btn-run').disabled = false;
-  document.getElementById('btn-run').textContent = '▶ 运行 Demo';
-  updateStatus('完成', 'idle');
+function resetPipeline() {
+  document.getElementById('event-log').innerHTML = '';
+  eventCount = 0;
+  document.querySelectorAll('.stage').forEach(s => { s.className = 'stage'; });
+  document.querySelectorAll('.stage-status').forEach(s => { s.textContent = '⬜'; });
+  document.querySelectorAll('.stage-agent').forEach(s => { s.textContent = ''; });
+  document.querySelectorAll('.agent-dot').forEach(d => { d.className = 'agent-dot idle'; });
+  document.getElementById('progress-text').textContent = '';
+  updateStatus('就绪', 'idle');
 }
 
 function resetAll() {
-  document.getElementById('event-log').innerHTML = '';
-  document.getElementById('pipeline-stages').innerHTML = stageData.map((s, i) => `
-    <div class="stage" id="stage-${i}">
-      <div class="stage-status">⬜</div>
-      <div class="stage-icon">${s.emoji}</div>
-      <div class="stage-info">
-        <div class="stage-name">${s.name}</div>
-        <div class="stage-agent" id="stage-agent-${i}"></div>
-      </div>
-    </div>
-  `).join('');
-  updateStatus('就绪', 'idle');
+  stopPolling();
+  resetPipeline();
   document.getElementById('btn-run').disabled = false;
   document.getElementById('btn-run').textContent = '▶ 运行 Demo';
-  document.getElementById('progress-text').textContent = '';
-  // Reset agent dots
-  document.querySelectorAll('.agent-dot').forEach(d => { d.className = 'agent-dot idle'; });
 }
 </script>
-
 </body>
 </html>
