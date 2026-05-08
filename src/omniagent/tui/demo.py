@@ -27,12 +27,13 @@ from ..core.orchestrator import Orchestrator, TaskAnalyzer
 from ..core.registry import AgentRegistry
 from ..core.workflow import SoftwareLifecycleWorkflow
 from ..protocol import AgentCapability, AgentEvent, Task, TaskStatus
+from .widgets.pipeline import StageStatus
 
 if TYPE_CHECKING:
     from .app import OmniAgentTUI
     from .widgets.agents_panel import AgentsPanel
     from .widgets.event_log import EventLog
-    from .widgets.pipeline import PipelinePanel, StageStatus
+    from .widgets.pipeline import PipelinePanel
 
 
 async def run_orchestration_demo(app: OmniAgentTUI) -> None:

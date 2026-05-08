@@ -17,54 +17,46 @@ class AgentRow(Static):
         self.agent_name = name
         self.capabilities = capabilities
         self._status = status
-        super().__init__(self._render())
+        super().__init__()
+        self._refresh()
 
-    def _render(self) -> str:
+    def _refresh(self) -> None:
         icons = {"idle": "○", "running": "◉", "done": "●", "error": "✕"}
         icon = icons.get(self._status, "○")
         caps = ", ".join(self.capabilities[:2])
-        return f" {icon} [bold]{self.agent_name}[/]\n   {caps}"
+        self.update(f" {icon} [bold]{self.agent_name}[/]\n   {caps}")
 
     def set_status(self, status: str) -> None:
         self._status = status
-        self.update(self._render())
+        self._refresh()
 
 
 class AgentsPanel(VerticalScroll):
     """Scrollable panel displaying all registered agents."""
 
+    _AGENTS = [
+        ("orchestrator", "🎯 Orchestrator", ["Task Analysis", "Agent Routing"]),
+        ("general-agent", "🤖 General Agent", ["General Purpose"]),
+        ("code-gen-agent", "💻 CodeGen Agent", ["Code Gen", "UI Design"]),
+        ("code-review-agent", "🔍 Review Agent", ["Code Review", "Testing"]),
+        ("doc-writer-agent", "📝 Doc Writer", ["Docs", "Copywriting"]),
+        ("test-agent", "🧪 Test Agent", ["Unit Tests", "E2E Tests"]),
+    ]
+
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._agents: dict[str, AgentRow] = {}
-        self._expanded = False
 
     def compose(self) -> ComposeResult:
-        yield Static(" Loading...", id="agents-loading")
-
-    def on_mount(self) -> None:
-        self._register_builtins()
-
-    def _register_builtins(self) -> None:
-        loading = self.query_one("#agents-loading", Static)
-        loading.remove()
-
-        builtins = [
-            ("orchestrator", "🎯 Orchestrator", ["Task Analysis", "Agent Routing"], "running"),
-            ("general-agent", "🤖 General Agent", ["General Purpose"], "idle"),
-            ("code-gen-agent", "💻 CodeGen Agent", ["Code Gen", "UI Design"], "idle"),
-            ("code-review-agent", "🔍 Review Agent", ["Code Review", "Testing"], "idle"),
-            ("doc-writer-agent", "📝 Doc Writer", ["Docs", "Copywriting"], "idle"),
-            ("test-agent", "🧪 Test Agent", ["Unit Tests", "E2E Tests"], "idle"),
-        ]
-
-        for agent_id, name, caps, status in builtins:
+        for agent_id, name, caps in self._AGENTS:
+            status = "running" if agent_id == "orchestrator" else "idle"
             row = AgentRow(agent_id, name, caps, status)
             self._agents[agent_id] = row
-            self.mount(row)
+            yield row
 
     def set_agent_status(self, agent_id: str, status: str) -> None:
         if agent_id in self._agents:
             self._agents[agent_id].set_status(status)
 
     def toggle_expand(self) -> None:
-        self._expanded = not self._expanded
+        self._expanded = not getattr(self, "_expanded", False)

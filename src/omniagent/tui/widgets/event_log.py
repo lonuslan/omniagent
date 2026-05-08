@@ -74,8 +74,10 @@ class EventLog(VerticalScroll):
         content = self.query_one("#event-content", Static)
         content.update("\n".join(self._lines))
 
-        # Auto-scroll to bottom
-        self.scroll_end(animate=False)
+        try:
+            self.scroll_end(animate=False)
+        except Exception:
+            pass  # Widget not yet laid out
 
     def clear(self) -> None:
         self._lines.clear()
