@@ -1,422 +1,135 @@
-<!DOCTYPE html><html lang="zh-CN">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>OmniAgent Studio</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{
-  --bg-body:#1a1b1e;--bg-sidebar:#1e1f22;--bg-card:#222327;--bg-input:#2d2f34;
-  --bg-hover:#2a2b2e;--border:#3a3b3e;--border-light:#4a4b50;
-  --text:#e1e1e3;--text2:#9b9c9e;--text3:#6b6c6e;
-  --accent:#7c8aff;--accent2:#5b6aef;--success:#4ade80;--warn:#f59e0b;--err:#f87171;
-  --font:'Inter','Segoe UI',system-ui,sans-serif;--mono:'JetBrains Mono',Consolas,monospace;
-}
-body{font-family:var(--font);background:var(--bg-body);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:13px}
-#titlebar{background:var(--bg-sidebar);border-bottom:1px solid var(--border);height:36px;display:flex;align-items:center;padding:0 12px;-webkit-app-region:drag;gap:8px}
-#titlebar .tl{font-weight:700;font-size:13px}
-#titlebar .tl span{color:var(--accent)}
-#titlebar .spacer{flex:1}
-#titlebar .ver{font-size:10px;color:var(--text3);background:var(--bg-card);padding:2px 8px;border-radius:10px}
+:root{--bg:#1a1b1e;--bg2:#1e1f22;--bg3:#222327;--bg4:#2d2f34;--bg5:#2a2b2e;--bd:#3a3b3e;--bd2:#4a4b50;--tx:#e1e1e3;--tx2:#9b9c9e;--tx3:#6b6c6e;--ac:#7c8aff;--ac2:#5b6aef;--ok:#4ade80;--wn:#f59e0b;--er:#f87171;--font:'Inter','Segoe UI',system-ui,sans-serif;--mono:'JetBrains Mono',Consolas,monospace}
+body{font-family:var(--font);background:var(--bg);color:var(--tx);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:13px}
+#titlebar{background:var(--bg2);border-bottom:1px solid var(--bd);height:36px;display:flex;align-items:center;padding:0 12px;-webkit-app-region:drag;gap:8px}
+#titlebar .tl{font-weight:700;font-size:13px}#titlebar .tl span{color:var(--ac)}#titlebar .spacer{flex:1}
+#titlebar .ver{font-size:10px;color:var(--tx3);background:var(--bg3);padding:2px 8px;border-radius:10px}
 #app{flex:1;display:flex;overflow:hidden}
-#sidebar-left{width:44px;min-width:44px;background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px}
-#sidebar-left .si{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer;font-size:15px;transition:.15s;position:relative}
-#sidebar-left .si:hover{background:var(--bg-hover);color:var(--text)}
-#sidebar-left .si.active{background:var(--bg-card);color:var(--accent)}
-#sidebar-left .si .tip{display:none;position:absolute;left:40px;top:50%;transform:translateY(-50%);background:var(--bg-card);border:1px solid var(--border);padding:3px 8px;border-radius:5px;font-size:10px;white-space:nowrap;z-index:10;pointer-events:none}
-#sidebar-left .si:hover .tip{display:block}
-#sidebar-left .ssp{flex:1}
-
-#main-content{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-body)}
-#conversation{flex:1;overflow-y:auto;padding:12px 0}
-.conv-inner{max-width:800px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:14px}
-.welcome{text-align:center;padding:40px 20px 24px}
-.welcome h1{font-size:20px;font-weight:700;margin-bottom:4px}
-.welcome h1 span{color:var(--accent)}
-.welcome p{color:var(--text2);font-size:12px;max-width:420px;margin:0 auto 16px}
+#sidebar{width:44px;min-width:44px;background:var(--bg2);border-right:1px solid var(--bd);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px}
+#sidebar .si{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--tx3);cursor:pointer;font-size:15px;transition:.15s;position:relative}
+#sidebar .si:hover{background:var(--bg5);color:var(--tx)}#sidebar .si.active{background:var(--bg3);color:var(--ac)}
+#sidebar .si .tip{display:none;position:absolute;left:40px;top:50%;transform:translateY(-50%);background:var(--bg3);border:1px solid var(--bd);padding:3px 8px;border-radius:5px;font-size:10px;white-space:nowrap;z-index:10}
+#sidebar .si:hover .tip{display:block}#sidebar .ssp{flex:1}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+#conv{flex:1;overflow-y:auto;padding:12px 0}
+.ci{max-width:800px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:12px}
+.welcome{text-align:center;padding:36px 20px 20px}.welcome h1{font-size:20px;font-weight:700;margin-bottom:4px}
+.welcome h1 span{color:var(--ac)}.welcome p{color:var(--tx2);font-size:12px;max-width:420px;margin:0 auto 14px}
 .welcome .qa{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
-.welcome .qa button{background:var(--bg-card);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:7px;font-size:11px;cursor:pointer;transition:.15s}
-.welcome .qa button:hover{background:var(--bg-hover)}
-
-.msg{display:flex;gap:10px;animation:in .2s}
-.msg-avatar{width:26px;height:26px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--bg-card)}
-.msg-body{max-width:85%}
-.msg-sender{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px;color:var(--text3)}
-.msg-bubble{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.6}
-.msg-bubble code{background:rgba(0,0,0,.3);padding:1px 4px;border-radius:3px;font-family:var(--mono);font-size:11px}
-
-.pipeline-card{background:#1a1b1e;border:1px solid var(--border);border-radius:8px;padding:3px 0;margin:4px 0}
-.pipeline-card .ps{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:11px;color:var(--text3);transition:all .3s}
-.pipeline-card .ps.running{color:var(--text);background:rgba(124,138,255,.05)}
-.pipeline-card .ps.completed{color:var(--text2)}
-.pipeline-card .ps.failed{color:var(--err);background:rgba(248,113,113,.05)}
-.pipeline-card .ps .pss{width:16px;font-size:12px}
-.pipeline-card .ps .psi{font-size:14px;width:20px;text-align:center}
-.pipeline-card .ps .psn{flex:1;font-weight:500}
-.pipeline-card .ps .psa{font-size:10px;color:var(--text3)}
-
-#input-bar{border-top:1px solid var(--border);background:var(--bg-sidebar);padding:10px 16px}
-.input-row{max-width:800px;margin:0 auto;display:flex;gap:8px;align-items:flex-end}
-/* Mode dropdown */
-.mode-dropdown{position:relative;-webkit-app-region:no-drag}
-.mode-dropdown .md-btn{
-  background:var(--bg-card);border:1px solid var(--border);color:var(--text2);
-  padding:7px 10px;border-radius:8px;font-size:11px;cursor:pointer;display:flex;
-  align-items:center;gap:4px;white-space:nowrap;min-width:80px;
-}
-.mode-dropdown .md-btn:hover{color:var(--text);border-color:var(--border-light)}
-.mode-dropdown .md-menu{
-  display:none;position:absolute;bottom:100%;left:0;margin-bottom:4px;
-  background:var(--bg-card);border:1px solid var(--border);border-radius:8px;
-  padding:4px;min-width:140px;z-index:20;
-}
-.mode-dropdown.open .md-menu{display:block}
-.mode-dropdown .md-item{
-  padding:8px 12px;border-radius:6px;cursor:pointer;font-size:11px;
-  display:flex;align-items:center;gap:8px;transition:.1s;
-}
-.mode-dropdown .md-item:hover{background:var(--bg-hover)}
-.mode-dropdown .md-item .md-desc{font-size:9px;color:var(--text3)}
-.mode-plan{color:#60a5fa}.mode-agent{color:#f59e0b}.mode-auto{color:#4ade80}
-
-.input-wrapper{flex:1;display:flex;gap:6px;background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:5px 8px;align-items:flex-end;transition:border-color .2s}
-.input-wrapper:focus-within{border-color:var(--accent2)}
-#user-input{flex:1;background:none;border:none;color:var(--text);font-family:var(--font);font-size:13px;resize:none;padding:5px 6px;outline:none;max-height:90px;min-height:20px}
-#user-input::placeholder{color:var(--text3)}
-#btn-send{background:var(--accent)!important;color:#fff!important;border:none;border-radius:7px!important;width:30px;height:30px;cursor:pointer;font-size:14px;transition:.15s;flex-shrink:0}
-#btn-send:hover{background:var(--accent2)!important}
-#btn-send:disabled{opacity:.4}
-
-/* Right panel */
-#right-panel{width:310px;min-width:310px;background:var(--bg-sidebar);border-left:1px solid var(--border);display:flex;flex-direction:column}
-#right-panel .rp-tabs{display:flex;border-bottom:1px solid var(--border)}
-#right-panel .rp-tab{flex:1;padding:7px 4px;text-align:center;font-size:10px;cursor:pointer;color:var(--text3);border-bottom:2px solid transparent;transition:.15s}
-#right-panel .rp-tab:hover{color:var(--text)}
-#right-panel .rp-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-#right-panel .rp-content{flex:1;overflow-y:auto;padding:6px}
-.rp-panel{display:none}
-.rp-panel.active{display:block}
-
-.agent-row{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:2px;border-radius:6px;font-size:11px;transition:.15s}
-.agent-row:hover{background:var(--bg-hover)}
-.agent-row .ar-dot{width:6px;height:6px;border-radius:50%;background:var(--text3);flex-shrink:0}
-.agent-row .ar-dot.running{background:var(--success);box-shadow:0 0 5px rgba(74,222,128,.4)}
-.agent-row .ar-info{flex:1;overflow:hidden}
-.agent-row .ar-name{font-weight:500;font-size:11px}
-.agent-row .ar-caps{font-size:9px;color:var(--text3)}
-
-/* Model config */
-.model-card{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px}
-.model-card .mc-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.model-card .mc-name{font-weight:600;font-size:12px}
-.model-card .mc-provider{font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg-hover);color:var(--text2)}
-.model-card .mc-info{font-size:10px;color:var(--text3);margin-bottom:8px;display:flex;gap:12px}
-.model-card .mc-key-row{display:flex;gap:6px}
-.model-card .mc-key-row input{
-  flex:1;background:var(--bg-input);border:1px solid var(--border);color:var(--text);
-  padding:5px 8px;border-radius:5px;font-size:11px;font-family:var(--mono);outline:none;
-}
-.model-card .mc-key-row input:focus{border-color:var(--accent2)}
-.model-card .mc-key-row button{
-  background:var(--bg-hover);border:1px solid var(--border);color:var(--text2);
-  padding:4px 10px;border-radius:5px;font-size:10px;cursor:pointer;white-space:nowrap;transition:.15s;
-}
-.model-card .mc-key-row button:hover{color:var(--text);border-color:var(--border-light)}
-.model-card .mc-key-row button.test-btn{background:var(--accent);color:#fff;border-color:var(--accent)}
-.model-card .mc-key-row button.test-btn:hover{background:var(--accent2)}
-.model-card .mc-key-row button.configured{color:var(--success);border-color:var(--success)}
-.model-card .mc-result{font-size:10px;margin-top:6px;padding:4px 8px;border-radius:4px}
-.model-card .mc-result.ok{background:rgba(74,222,128,.1);color:var(--success)}
-.model-card .mc-result.err{background:rgba(248,113,113,.1);color:var(--err)}
-
-.audit-item{padding:5px 10px;font-size:10px;font-family:var(--mono);border-bottom:1px solid var(--border);color:var(--text2)}
-.audit-item .ai-time{color:var(--text3)}
-.audit-item .ai-tool{color:var(--accent);font-weight:600}
-
-#statusbar{background:var(--bg-sidebar);border-top:1px solid var(--border);height:24px;display:flex;align-items:center;padding:0 10px;font-size:10px;color:var(--text3);gap:12px}
-#statusbar .sb-dot{width:5px;height:5px;border-radius:50%;background:var(--success)}
-#statusbar .sb-dot.busy{background:var(--warn);animation:pulse 1s infinite}
-#statusbar .sb-spacer{flex:1}
-
-@keyframes in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-::-webkit-scrollbar{width:5px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-</style>
-</head>
-<body>
-
-<div id="titlebar">
-  <div class="tl">🎯 <span>OmniAgent</span> Studio</div>
-  <div class="spacer"></div>
-  <div class="ver">v0.2.0</div>
-</div>
-
+.welcome .qa button{background:var(--bg3);border:1px solid var(--bd);color:var(--tx);padding:6px 12px;border-radius:7px;font-size:11px;cursor:pointer;transition:.15s}
+.welcome .qa button:hover{background:var(--bg5)}
+.msg{display:flex;gap:10px;animation:in .2s}.msg-av{width:26px;height:26px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--bg3)}
+.msg-bd{max-width:85%}.msg-s{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px;color:var(--tx3)}
+.msg-b{background:var(--bg3);border:1px solid var(--bd);border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.6}
+.pc{background:#1a1b1e;border:1px solid var(--bd);border-radius:8px;padding:3px 0;margin:4px 0}
+.pc .ps{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:11px;color:var(--tx3);transition:all .3s}
+.pc .ps.running{color:var(--tx);background:rgba(124,138,255,.05)}.pc .ps.completed{color:var(--tx2)}
+.pc .ps .pss{width:16px;font-size:12px}.pc .ps .psi{font-size:14px;width:20px;text-align:center}
+.pc .ps .psn{flex:1;font-weight:500}.pc .ps .psa{font-size:10px;color:var(--tx3)}
+#input-bar{border-top:1px solid var(--bd);background:var(--bg2);padding:10px 16px}
+.ir{max-width:800px;margin:0 auto;display:flex;gap:8px;align-items:flex-end}
+.md{position:relative}.md-btn{background:var(--bg3);border:1px solid var(--bd);color:var(--tx2);padding:7px 10px;border-radius:8px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.md-btn:hover{color:var(--tx);border-color:var(--bd2)}.md-menu{display:none;position:absolute;bottom:100%;left:0;margin-bottom:4px;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:4px;min-width:140px;z-index:20}
+.md.open .md-menu{display:block}.md-item{padding:8px 12px;border-radius:6px;cursor:pointer;font-size:11px;display:flex;align-items:center;gap:8px}
+.md-item:hover{background:var(--bg5)}.md-item .mdd{font-size:9px;color:var(--tx3)}
+.iw{flex:1;display:flex;gap:6px;background:var(--bg4);border:1px solid var(--bd);border-radius:10px;padding:5px 8px;align-items:flex-end;transition:border-color .2s}
+.iw:focus-within{border-color:var(--ac2)}#ui{flex:1;background:none;border:none;color:var(--tx);font-family:var(--font);font-size:13px;resize:none;padding:5px 6px;outline:none;max-height:90px;min-height:20px}
+#ui::placeholder{color:var(--tx3)}#bs{background:var(--ac)!important;color:#fff!important;border:none;border-radius:7px!important;width:30px;height:30px;cursor:pointer;font-size:14px;flex-shrink:0}
+#bs:hover{background:var(--ac2)!important}#bs:disabled{opacity:.4}
+#rp{width:340px;min-width:340px;background:var(--bg2);border-left:1px solid var(--bd);display:flex;flex-direction:column}
+.rt{display:flex;border-bottom:1px solid var(--bd)}.rtb{flex:1;padding:7px 4px;text-align:center;font-size:10px;cursor:pointer;color:var(--tx3);border-bottom:2px solid transparent;transition:.15s}
+.rtb:hover{color:var(--tx)}.rtb.active{color:var(--ac);border-bottom-color:var(--ac)}
+.rc{flex:1;overflow-y:auto;padding:8px}.rp-p{display:none}.rp-p.active{display:block}
+.mtags{display:flex;flex-wrap:wrap;gap:4px;padding:0 0 10px}
+.mtag{padding:5px 10px;border-radius:14px;font-size:10px;cursor:pointer;border:1px solid var(--bd);color:var(--tx2);transition:.15s;white-space:nowrap}
+.mtag:hover{border-color:var(--bd2);color:var(--tx)}.mtag.sel{border-color:var(--ac);color:var(--ac);background:rgba(124,138,255,.1)}
+.mtag.active-tag{border-color:var(--ok);color:var(--ok)}
+.cfg label{display:block;font-size:10px;color:var(--tx3);margin:8px 0 3px;font-weight:600}
+.cfg input,.cfg textarea{width:100%;background:var(--bg4);border:1px solid var(--bd);color:var(--tx);padding:6px 8px;border-radius:5px;font-size:11px;font-family:var(--mono);outline:none}
+.cfg input:focus,.cfg textarea:focus{border-color:var(--ac2)}.cfg textarea{height:55px;resize:vertical;font-size:10px}
+.cfg .row{display:flex;gap:8px}.cfg .row>div{flex:1}
+.cfg .btns{display:flex;gap:6px;margin-top:12px}
+.cfg .btns button{padding:6px 14px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;transition:.15s;border:1px solid var(--bd)}
+.cfg .btn-save{background:var(--ac);color:#fff;border-color:var(--ac)}.cfg .btn-test{background:var(--bg3);color:var(--tx)}
+.cfg .btn-activate{background:var(--ok);color:#000;border-color:var(--ok)}
+.cfg .result{margin-top:8px;padding:6px 10px;border-radius:5px;font-size:10px;font-family:var(--mono)}
+.cfg .result.ok{background:rgba(74,222,128,.1);color:var(--ok)}.cfg .result.err{background:rgba(248,113,113,.1);color:var(--er)}
+.agent-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:11px;transition:.15s}
+.agent-row:hover{background:var(--bg5)}.agent-row .ad{width:6px;height:6px;border-radius:50%;background:var(--tx3);flex-shrink:0}
+.agent-row .ad.running{background:var(--ok);box-shadow:0 0 5px rgba(74,222,128,.4)}.agent-row .ai{flex:1;overflow:hidden}
+.agent-row .an{font-weight:500;font-size:11px}.agent-row .ac{font-size:9px;color:var(--tx3)}
+.tool-row{padding:6px 10px;margin-bottom:2px;border-radius:6px;font-size:11px;transition:.15s}
+.tool-row:hover{background:var(--bg5)}.tool-row .tn{font-family:var(--mono);color:var(--ac);font-weight:600;font-size:10px}
+.tool-row .td{font-size:10px;color:var(--tx3);margin-top:2px}
+#statusbar{background:var(--bg2);border-top:1px solid var(--bd);height:24px;display:flex;align-items:center;padding:0 10px;font-size:10px;color:var(--tx3);gap:12px}
+#statusbar .sd{width:5px;height:5px;border-radius:50%;background:var(--ok)}#statusbar .sd.busy{background:var(--wn);animation:pulse 1s infinite}
+#statusbar .ssp{flex:1}@keyframes in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
+</style></head><body>
+<div id="titlebar"><div class="tl">🎯 <span>OmniAgent</span> Studio</div><div class="spacer"></div><div class="ver">v0.2.0</div></div>
 <div id="app">
-  <div id="sidebar-left">
-    <div class="si active"><span>💬</span><span class="tip">对话</span></div>
-    <div class="si"><span>📁</span><span class="tip">文件 (未来)</span></div>
-    <div class="si"><span>🔍</span><span class="tip">搜索 (未来)</span></div>
-    <div class="si"><span>🧩</span><span class="tip">插件 (未来)</span></div>
-    <div class="ssp"></div>
-    <div class="si"><span>⚙️</span><span class="tip">设置</span></div>
-  </div>
-
-  <div id="main-content">
-    <div id="conversation"><div class="conv-inner" id="conv-inner">
-      <div class="welcome" id="welcome-msg">
-        <h1>🎯 <span>OmniAgent</span> Studio</h1>
-        <p>自主多Agent协同平台 — 输入任务，AI 自动分解并调度最优 Agent 协作完成</p>
-        <div class="qa">
-          <button onclick="send('Build a full-stack todo app with React + FastAPI')">💻 软件开发</button>
-          <button onclick="send('Create a 3-minute product launch video')">🎬 视频制作</button>
-          <button onclick="send('Write a technical design document')">📝 文档写作</button>
-        </div>
-      </div>
-    </div></div>
-
-    <div id="input-bar">
-      <div class="input-row">
-        <!-- Mode dropdown -->
-        <div class="mode-dropdown" id="mode-dropdown">
-          <button class="md-btn" onclick="document.getElementById('mode-dropdown').classList.toggle('open')">
-            <span id="md-icon">🤖</span> <span id="md-label">Agent</span> ▾
-          </button>
-          <div class="md-menu">
-            <div class="md-item" onclick="switchMode('plan')">
-              <span>🔍</span><span><b>Plan</b><br><span class="md-desc">只读探索，不修改文件</span></span>
-            </div>
-            <div class="md-item" onclick="switchMode('agent')">
-              <span>🤖</span><span><b>Agent</b><br><span class="md-desc">每步操作需确认</span></span>
-            </div>
-            <div class="md-item" onclick="switchMode('auto')">
-              <span>⚡</span><span><b>Auto</b><br><span class="md-desc">全自动执行</span></span>
-            </div>
-          </div>
-        </div>
-        <div class="input-wrapper">
-          <textarea id="user-input" placeholder="描述你的任务…" rows="1"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send(this.value)}"></textarea>
-          <button id="btn-send" onclick="send(document.getElementById('user-input').value)">↑</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="right-panel">
-    <div class="rp-tabs">
-      <div class="rp-tab active" onclick="switchTab('agents')">🤖 Agents</div>
-      <div class="rp-tab" onclick="switchTab('models')">🔑 模型</div>
-      <div class="rp-tab" onclick="switchTab('tools')">🔧 工具</div>
-      <div class="rp-tab" onclick="switchTab('audit')">📋 审计</div>
-    </div>
-    <div class="rp-content">
-      <!-- Agents panel -->
-      <div class="rp-panel active" id="rp-agents">
-        <div class="agent-row" id="ar-orchestrator"><div class="ar-dot" id="ard-orchestrator"></div><div class="ar-info"><div class="ar-name">🎯 Orchestrator</div><div class="ar-caps">任务分析 · Agent 调度</div></div></div>
-        <div class="agent-row" id="ar-general-agent"><div class="ar-dot" id="ard-general-agent"></div><div class="ar-info"><div class="ar-name">🤖 General Agent</div><div class="ar-caps">通用任务处理</div></div></div>
-        <div class="agent-row" id="ar-code-gen-agent"><div class="ar-dot" id="ard-code-gen-agent"></div><div class="ar-info"><div class="ar-name">💻 CodeGen Agent</div><div class="ar-caps">代码生成 · UI 设计</div></div></div>
-        <div class="agent-row" id="ar-code-review-agent"><div class="ar-dot" id="ard-code-review-agent"></div><div class="ar-info"><div class="ar-name">🔍 Review Agent</div><div class="ar-caps">代码审查 · 测试</div></div></div>
-        <div class="agent-row" id="ar-doc-writer-agent"><div class="ar-dot" id="ard-doc-writer-agent"></div><div class="ar-info"><div class="ar-name">📝 Doc Writer</div><div class="ar-caps">文档 · 文案</div></div></div>
-        <div class="agent-row" id="ar-test-agent"><div class="ar-dot" id="ard-test-agent"></div><div class="ar-info"><div class="ar-name">🧪 Test Agent</div><div class="ar-caps">测试生成 · E2E</div></div></div>
-      </div>
-      <!-- Models panel -->
-      <div class="rp-panel" id="rp-models">
-        <div style="font-size:10px;color:var(--text3);padding:4px 2px 8px">选择模型 → 填入 API Key → 测试连接</div>
-        <div id="model-list"></div>
-      </div>
-      <!-- Tools panel -->
-      <div class="rp-panel" id="rp-tools">
-        <div style="font-size:10px;color:var(--text3);padding:4px 2px 8px">Agent 可用工具集 (11 tools)</div>
-        <div id="tools-list"></div>
-      </div>
-      <!-- Audit panel -->
-      <div class="rp-panel" id="rp-audit">
-        <div style="font-size:10px;color:var(--text3);padding:4px 2px 8px">工具调用审计 (最近 50 条)</div>
-        <div id="audit-list"><div style="padding:12px;text-align:center;color:var(--text3);font-size:11px">运行 Demo 后显示</div></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="statusbar">
-  <div class="sb-dot" id="sb-dot"></div><span id="sb-status">就绪</span>
-  <span class="sb-spacer"></span>
-  <span id="sb-mode-text">Agent · 每步确认</span>
-  <span class="sb-spacer"></span>
-  <span id="sb-progress"></span>
-  <span class="sb-spacer"></span>
-  <span id="sb-llm-status">🔌 LLM 未配置</span>
-  <span class="sb-spacer"></span>
-  <span>5 Agents</span>
-</div>
-
+<div id="sidebar"><div class="si active"><span>💬</span><span class="tip">对话</span></div><div class="ssp"></div><div class="si"><span>⚙️</span><span class="tip">设置</span></div></div>
+<div id="main"><div id="conv"><div class="ci" id="ci">
+<div class="welcome" id="wmsg"><h1>🎯 <span>OmniAgent</span> Studio</h1>
+<p>自主多Agent协同平台 — 配置 LLM → 输入任务 → AI 自动调度最优 Agent 协作完成</p>
+<div class="qa">
+<button onclick="s('用React+FastAPI构建一个全栈待办事项应用，包含用户认证和响应式设计')">💻 软件开发</button>
+<button onclick="s('帮我写一份微服务架构的技术设计文档')">📝 文档写作</button>
+</div></div></div></div>
+<div id="input-bar"><div class="ir">
+<div class="md" id="md"><button class="md-btn" onclick="document.getElementById('md').classList.toggle('open')"><span id="mdi">🤖</span> <span id="mdl">Agent</span> ▾</button>
+<div class="md-menu"><div class="md-item" onclick="sm('plan')"><span>🔍</span><span><b>Plan</b><br><span class="mdd">只读探索</span></span></div>
+<div class="md-item" onclick="sm('agent')"><span>🤖</span><span><b>Agent</b><br><span class="mdd">每步确认</span></span></div>
+<div class="md-item" onclick="sm('auto')"><span>⚡</span><span><b>Auto</b><br><span class="mdd">全自动</span></span></div></div></div>
+<div class="iw"><textarea id="ui" placeholder="描述你的任务… (Enter 发送)" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();s(this.value)}"></textarea><button id="bs" onclick="s(document.getElementById('ui').value)">↑</button></div>
+</div></div></div>
+<div id="rp"><div class="rt"><div class="rtb active" onclick="st('agents')">🤖 Agents</div><div class="rtb" onclick="st('models')">🔑 模型</div><div class="rtb" onclick="st('tools')">🔧 工具</div><div class="rtb" onclick="st('audit')">📋 审计</div></div>
+<div class="rc">
+<div class="rp-p active" id="rp-agents"><div id="alist"></div></div>
+<div class="rp-p" id="rp-models"><div class="mtags" id="mtags"></div><div id="mcfg"><span style="font-size:11px;color:var(--tx3)">↑ 点击上方标签选择模型进行配置</span></div></div>
+<div class="rp-p" id="rp-tools"><div id="tlist"></div></div>
+<div class="rp-p" id="rp-audit"><div id="al"><span style="font-size:11px;color:var(--tx3)">运行后显示审计记录</span></div></div>
+</div></div></div>
+<div id="statusbar"><div class="sd" id="sd"></div><span id="ss">就绪</span><span class="ssp"></span><span id="sl">🔌 LLM 未配置</span><span class="ssp"></span><span id="sp"></span><span class="ssp"></span><span>5 Agents</span></div>
 <script>
-let pollTimer=null, isRunning=false, currentMode='agent';
-
-// ── Mode ──
-async function switchMode(mode) {
-  currentMode = mode;
-  document.getElementById('mode-dropdown').classList.remove('open');
-  const icons = {plan:'🔍', agent:'🤖', auto:'⚡'};
-  const labels = {plan:'Plan', agent:'Agent', auto:'Auto'};
-  const texts = {plan:'Plan · 只读', agent:'Agent · 确认', auto:'Auto · 全自动'};
-  document.getElementById('md-icon').textContent = icons[mode];
-  document.getElementById('md-label').textContent = labels[mode];
-  document.getElementById('sb-mode-text').textContent = texts[mode];
-  try{await pywebview.api.set_mode(mode)}catch(e){console.error(e);}
-}
-
-// ── Tabs ──
-const TAB_ORDER = ['agents','models','tools','audit'];
-function switchTab(tab) {
-  document.querySelectorAll('.rp-tab').forEach((t,i)=>{t.classList.toggle('active', TAB_ORDER[i]===tab)});
-  document.querySelectorAll('.rp-panel').forEach(p=>p.classList.remove('active'));
-  document.getElementById('rp-'+tab).classList.add('active');
-}
-
-// ── Models ──
-async function loadModels() {
-  try{
-    const data = JSON.parse(await pywebview.api.get_models());
-    const models = data.models; const active = data.active_model;
-    const el = document.getElementById('model-list');
-    el.innerHTML = models.map(m => `
-      <div class="model-card" id="mcard-${m.id}" style="${m.active?'border-color:var(--accent);box-shadow:0 0 6px rgba(124,138,255,.15)':''}">
-        <div class="mc-header"><span class="mc-name">${m.name}</span><span class="mc-provider">${m.provider}</span>${m.active?'<span style="font-size:10px;color:var(--accent);font-weight:600">⚡ 使用中</span>':''}</div>
-        <div class="mc-info"><span>📐 ${m.context}</span><span>💰 ${m.pricing}</span>${m.configured?'<span style="color:var(--success)">✅ 已配置</span>':''}</div>
-        <div class="mc-key-row">
-          <input type="password" id="key-${m.id}" placeholder="API Key" value="${m.has_key?'••••••••':''}" style="font-family:var(--mono);font-size:10px">
-          <button onclick="saveModel('${m.id}')">💾</button>
-          <button class="test-btn" onclick="testModel('${m.id}')">🔌 测试</button>
-          ${m.configured&&!m.active?`<button style="background:var(--accent);color:#fff;border-color:var(--accent)" onclick="selectModel('${m.id}')">✅ 启用</button>`:''}
-          ${m.active?`<button style="color:var(--success);border-color:var(--success)">⚡ 已启用</button>`:''}
-          <button onclick="usageModel('${m.id}')">📊</button>
-        </div>
-        <div id="result-${m.id}"></div>
-      </div>
-    `).join('');
-  }catch(e){document.getElementById('model-list').innerHTML='<div style="padding:12px;color:var(--err);font-size:11px">加载失败: '+e.message+'</div>';}
-}
-
-async function selectModel(id){
-  try{const r=JSON.parse(await pywebview.api.select_model(id));
-    if(r.status==='ok'){showResult(id,'模型已激活','ok');loadModels();refreshLLMStatus()}
-    else{showResult(id,r.message,'err')}
-  }catch(e){showResult(id,'激活失败','err')}
-}
-async function saveModel(id){
-  const key = document.getElementById('key-'+id).value.trim();
-  if(!key){showResult(id,'请输入 API Key','err');return}
-  try{await pywebview.api.save_model_config(id, key, ''); showResult(id,'已保存，点击"启用"激活模型','ok');loadModels()}catch(e){showResult(id,'保存失败','err')}
-}
-async function testModel(id){
-  showResult(id,'测试中…','')
-  try{const r=JSON.parse(await pywebview.api.test_model_connection(id)); showResult(id,r.message,r.status)}catch(e){showResult(id,'测试失败: '+e.message,'err')}
-}
-async function usageModel(id){
-  try{const r=JSON.parse(await pywebview.api.get_model_usage(id));
-    showResult(id,`📊 请求:${r.usage.total_requests} | Input:${r.usage.total_input_tokens} | Output:${r.usage.total_output_tokens} | 费用:${r.usage.estimated_cost} | ${r.usage.note}`,'ok')
-  }catch(e){showResult(id,'查询失败','err')}
-}
-function showResult(id, msg, cls){
-  document.getElementById('result-'+id).innerHTML = `<div class="mc-result ${cls}">${msg}</div>`;
-}
-
-// ── Send ──
-async function send(text){
-  if(!text||!text.trim()||isRunning)return;
-  document.getElementById('user-input').value='';document.getElementById('user-input').style.height='auto';
-  const w=document.getElementById('welcome-msg');if(w)w.remove();
-  addMsg('👤','YOU',text.trim());updateStatus('分析中…',true);
-  document.getElementById('btn-send').disabled=true;
-  try{const r=JSON.parse(await pywebview.api.run_demo());if(r.status==='started'){addMsg('🎯','ORCHESTRATOR','任务已接收，正在分析…');startPolling()}}
-  catch(e){addMsg('🎯','ORCHESTRATOR','错误: '+e.message);updateStatus('就绪',false);document.getElementById('btn-send').disabled=false}
-}
-
-// ── Messages ──
-function addMsg(avatar,sender,text){
-  const el=document.getElementById('conv-inner');const d=document.createElement('div');
-  d.className='msg';d.innerHTML=`<div class="msg-avatar">${avatar}</div><div class="msg-body"><div class="msg-sender">${sender}</div><div class="msg-bubble">${esc(text)}</div></div>`;
-  el.appendChild(d);document.getElementById('conversation').scrollTop=document.getElementById('conversation').scrollHeight;
-}
-function addPipelineCard(stages){
-  const el=document.getElementById('conv-inner');const d=document.createElement('div');d.className='msg';
-  d.innerHTML=`<div class="msg-avatar">🔄</div><div class="msg-body" style="flex:1;max-width:100%"><div class="msg-sender">PIPELINE</div><div class="msg-bubble" style="padding:0"><div class="pipeline-card">${stages.map((s,i)=>`<div class="ps" id="ps-${i}"><span class="pss">⬜</span><span class="psi">${s.emoji||'▶️'}</span><span class="psn">${s.name}</span><span class="psa" id="psa-${i}"></span></div>`).join('')}</div></div></div>`;
-  el.appendChild(d);document.getElementById('conversation').scrollTop=document.getElementById('conversation').scrollHeight;
-}
-
-// ── Polling ──
-function startPolling(){
-  if(pollTimer)clearInterval(pollTimer);let cardAdded=false;
-  pollTimer=setInterval(async()=>{
-    try{const events=JSON.parse(await pywebview.api.poll_events());
-      for(const e of events){
-        if(e.type==='event')addMsg('🎯',e.source.toUpperCase(),e.message);
-        else if(e.type==='action'){
-          if(e.action==='init_pipeline'&&!cardAdded){cardAdded=true;addPipelineCard(e.stages||[{name:'需求确认',emoji:'📋'},{name:'需求分析',emoji:'🔬'},{name:'原型设计',emoji:'🎨'},{name:'前端开发',emoji:'💻'},{name:'后端开发',emoji:'⚙️'},{name:'测试',emoji:'🧪'},{name:'部署上线',emoji:'🚀'}])}
-          else if(e.action==='stage_update'){updateStage(e.index,e.status,e.agent);updateDot(e.agent,e.status)}
-          else if(e.action==='demo_complete'){stopPolling('完成');refreshAudit()}
-        }
-      }
-    }catch(e){console.error(e);}
-  },200)
-}
-function stopPolling(msg){if(pollTimer){clearInterval(pollTimer);pollTimer=null}updateStatus(msg||'完成',false);document.getElementById('btn-send').disabled=false;isRunning=false;document.querySelectorAll('.ar-dot.running').forEach(d=>d.classList.remove('running'))}
-
-function updateStage(i,status,agent){
-  const s=document.getElementById('ps-'+i);if(!s)return;s.className='ps '+status;
-  const icons={pending:'⬜',running:'⚡',completed:'✅',failed:'❌'};
-  s.querySelector('.pss').textContent=icons[status]||'⬜';
-  const a=document.getElementById('psa-'+i);if(a&&agent)a.textContent='→ '+agent.replace('Agent','').replace('-',' ').trim();
-  const done=document.querySelectorAll('.ps.completed').length;
-  document.getElementById('sb-progress').textContent=done?`Stage ${Math.min(done+1,7)}/7`:'';
-}
-function updateDot(id,status){const d=document.getElementById('ard-'+id);if(d)d.className='ar-dot'+(status==='running'?' running':'')}
-function updateStatus(text,busy){document.getElementById('sb-status').textContent=text;document.getElementById('sb-dot').className=busy?'sb-dot busy':'sb-dot'}
-
-async function refreshAudit(){
-  try{const log=JSON.parse(await pywebview.api.get_audit_log());const el=document.getElementById('audit-list');
-    if(!log.length){el.innerHTML='<div style="padding:12px;text-align:center;color:var(--text3);font-size:11px">暂无审计记录</div>';return}
-    el.innerHTML=log.map(l=>`<div class="audit-item${l.error?' error':''}"><span class="ai-time">${new Date(l.time*1000).toLocaleTimeString('zh-CN',{hour12:false})}</span> <span class="ai-tool">${l.tool}</span> → ${l.result.slice(0,60)} <span style="color:var(--text3)">(${l.duration_ms}ms)</span></div>`).join('')
-  }catch(e){console.error(e);}
-}
-
-function esc(t){const d=document.createElement('div');d.textContent=t;return d.innerHTML}
-document.getElementById('user-input').addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,90)+'px'});
-document.addEventListener('click',e=>{if(!e.target.closest('.mode-dropdown'))document.getElementById('mode-dropdown').classList.remove('open')});
-
-// ── Tools ──
-async function loadTools(){
-  try{
-    const tools = JSON.parse(await pywebview.api.get_tools());
-    const el = document.getElementById('tools-list');
-    const cats = {file:'📁 文件',shell:'💻 Shell',web:'🌐 网络'};
-    el.innerHTML = tools.map(t=>`
-      <div style="padding:7px 10px;margin-bottom:2px;border-radius:6px;font-size:11px;transition:.15s"
-           onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-family:var(--mono);color:var(--accent);font-weight:600">${t.name}</span>
-          ${t.requires_approval?'<span style="font-size:9px;color:var(--warn)">需审批</span>':''}
-        </div>
-        <div style="font-size:10px;color:var(--text3);margin-top:2px">${t.description}</div>
-        <div style="font-size:9px;color:var(--text3);margin-top:2px">${cats[t.category]||t.category}</div>
-      </div>
-    `).join('');
-  }catch(e){console.error(e);}
-}
-
-async function refreshLLMStatus(){
-  try{const s=JSON.parse(await pywebview.api.get_llm_status());
-    document.getElementById('sb-llm-status').textContent = s.configured ? '🔌 LLM 已连接' : '🔌 LLM 未配置';
-  }catch(e){console.error(e);}
-}
-// Init
-function initPanels(){
-  loadModels();loadTools();updateStatus('就绪',false);refreshLLMStatus();
-}
-setTimeout(initPanels, 300);
-document.addEventListener('DOMContentLoaded', initPanels);
-</script>
-</body>
-</html>
+var pt=null,running=false,cm="agent",activeModel="",allModels=[];
+function sm(m){cm=m;document.getElementById("md").classList.remove("open");
+document.getElementById("mdi").textContent={plan:"🔍",agent:"🤖",auto:"⚡"}[m];
+document.getElementById("mdl").textContent={plan:"Plan",agent:"Agent",auto:"Auto"}[m];
+try{pywebview.api.set_mode(m)}catch(e){}}
+function st(tab){document.querySelectorAll(".rtb").forEach(function(b,i){b.classList.toggle("active",["agents","models","tools","audit"][i]===tab)});
+document.querySelectorAll(".rp-p").forEach(function(p){p.classList.remove("active")});
+document.getElementById("rp-"+tab).classList.add("active")}
+async function lm(){try{var d=JSON.parse(await pywebview.api.get_models());allModels=d.models;activeModel=d.active_model;rm()}catch(e){document.getElementById("mtags").innerHTML='<span style="color:var(--er);font-size:11px">加载失败: '+e.message+'</span>'}}
+function rm(){document.getElementById("mtags").innerHTML=allModels.map(function(m){return '<span class="mtag'+(m.active?" active-tag":"")+(activeModel===m.id?" sel":"")+'" onclick="smd(\''+m.id+'\')" id="mtag-'+m.id+'">'+m.name+(activeModel===m.id?" ⚡":"")+'</span>'}).join("")}
+async function smd(id){try{var d=JSON.parse(await pywebview.api.get_model_defaults(id));
+document.getElementById("mcfg").innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="font-size:13px">'+d.name+'</b><span style="font-size:10px;color:var(--ac)">'+d.provider+'</span><span style="font-size:10px;color:var(--tx3)">| '+d.api_format+' | '+d.context+'</span><a href="'+d.doc_url+'" style="font-size:10px;color:var(--ac);margin-left:auto" target="_blank">📖 文档</a></div><label>🔑 API Key</label><input type="password" id="fkey" value="'+d.api_key+'" placeholder="sk-..."><label>🔗 Base URL</label><input type="text" id="furl" value="'+(d.base_url_override||d.base_url)+'" placeholder="'+d.base_url+'"><div class="row"><div><label>📐 Max Tokens</label><input type="number" id="fmt" value="'+d.max_tokens+'"></div><div><label>🌡️ Temperature</label><input type="number" id="ftemp" value="'+d.temperature+'" step="0.1" min="0" max="2"></div></div><label>📝 额外配置 (auth: '+d.auth_format+', format: '+d.api_format+')</label><textarea id="fyaml" placeholder="# Extra config">'+(d.extra_headers||"")+'</textarea><div class="btns"><button class="btn-save" onclick="sv(\''+d.id+'\')">💾 保存</button><button class="btn-test" onclick="test(\''+d.id+'\')">🔌 测试</button>'+(activeModel===d.id?'<button class="btn-activate">⚡ 已激活</button>':'<button class="btn-activate" onclick="act(\''+d.id+'\')">✅ 激活</button>')+'</div><div id="res-'+d.id+'"></div>';
+document.getElementById("mtags").querySelectorAll(".mtag").forEach(function(t){t.classList.remove("sel")});
+document.getElementById("mtag-"+id).classList.add("sel")}catch(e){document.getElementById("mcfg").innerHTML='<div style="color:var(--er);font-size:11px">'+e.message+'</div>'}}
+async function sv(id){var cfg={api_key:document.getElementById("fkey").value.trim(),base_url:document.getElementById("furl").value.trim(),max_tokens:parseInt(document.getElementById("fmt").value)||4096,temperature:parseFloat(document.getElementById("ftemp").value)||0.7};if(!cfg.api_key){sr(id,"请输入 API Key","err");return}
+try{await pywebview.api.save_model_config(id,JSON.stringify(cfg));sr(id,"已保存","ok");lm()}catch(e){sr(id,"保存失败","err")}}
+async function test(id){sr(id,"测试中…","");try{var r=JSON.parse(await pywebview.api.test_model_connection(id));sr(id,(r.latency_ms?"["+r.latency_ms+"ms] ":"")+r.message,r.status)}catch(e){sr(id,"测试失败: "+e.message,"err")}}
+async function act(id){try{var r=JSON.parse(await pywebview.api.select_model(id));if(r.status==="ok"){sr(id,"模型已激活","ok");activeModel=id;lm();rl()}}catch(e){sr(id,"激活失败","err")}}
+function sr(id,msg,cls){document.getElementById("res-"+id).innerHTML='<div class="result '+cls+'">'+msg+'</div>'}
+async function la(){try{var a=JSON.parse(await pywebview.api.get_agents());document.getElementById("alist").innerHTML=a.map(function(a){return '<div class="agent-row" id="ar-'+a.id+'"><div class="ad" id="ard-'+a.id+'"></div><div class="ai"><div class="an">'+a.name+'</div><div class="ac">'+(a.capabilities||[]).slice(0,2).join(", ")+'</div></div></div>'}).join("")}catch(e){}}
+async function lt(){try{var t=JSON.parse(await pywebview.api.get_tools());var cats={file:"📁",shell:"💻",web:"🌐"};document.getElementById("tlist").innerHTML=t.map(function(t){return '<div class="tool-row"><span class="tn">'+t.name+'</span> <span style="font-size:9px;color:var(--tx3)">'+cats[t.category]+(t.requires_approval?" 🔒":"")+'</span><div class="td">'+t.description+'</div></div>'}).join("")}catch(e){}}
+async function rl(){try{var s=JSON.parse(await pywebview.api.get_llm_status());document.getElementById("sl").textContent=s.active_model?"🔌 LLM: "+s.active_model:"🔌 LLM 未配置"}catch(e){}}
+async function s(t){if(!t||!t.trim()||running)return;document.getElementById("ui").value="";document.getElementById("ui").style.height="auto";var w=document.getElementById("wmsg");if(w)w.remove();am("👤","YOU",t.trim());us("分析中…",true);document.getElementById("bs").disabled=true;
+try{var r=JSON.parse(await pywebview.api.execute_task(t.trim()));if(r.status==="started"){am("🎯","ORCHESTRATOR","任务已接收"+(r.mode==="llm"?" (LLM 模式)":" (Demo 模式)"));sp()}}catch(e){am("🎯","ORCHESTRATOR","错误: "+e.message);us("就绪",false);document.getElementById("bs").disabled=false}}
+function am(av,sn,tx){var e=document.getElementById("ci");var d=document.createElement("div");d.className="msg";d.innerHTML='<div class="msg-av">'+av+'</div><div class="msg-bd"><div class="msg-s">'+sn+'</div><div class="msg-b">'+et(tx)+'</div></div>';e.appendChild(d);document.getElementById("conv").scrollTop=document.getElementById("conv").scrollHeight}
+function apc(ss){var e=document.getElementById("ci");var d=document.createElement("div");d.className="msg";d.innerHTML='<div class="msg-av">🔄</div><div class="msg-bd" style="flex:1;max-width:100%"><div class="msg-s">PIPELINE</div><div class="msg-b" style="padding:0"><div class="pc">'+ss.map(function(s,i){return '<div class="ps" id="ps-'+i+'"><span class="pss">⬜</span><span class="psi">'+(s.emoji||"▶️")+'</span><span class="psn">'+s.name+'</span><span class="psa" id="psa-'+i+'"></span></div>'}).join("")+'</div></div></div>';e.appendChild(d);document.getElementById("conv").scrollTop=document.getElementById("conv").scrollHeight}
+function sp(){if(pt)clearInterval(pt);var ca=false;pt=setInterval(async function(){try{var ev=JSON.parse(await pywebview.api.poll_events());ev.forEach(function(e){if(e.type==="event")am("🎯",e.source.toUpperCase(),e.message);else if(e.type==="action"){if(e.action==="init_pipeline"&&!ca){ca=true;apc(e.stages||[{name:"需求确认",emoji:"📋"},{name:"需求分析",emoji:"🔬"},{name:"原型设计",emoji:"🎨"},{name:"前端开发",emoji:"💻"},{name:"后端开发",emoji:"⚙️"},{name:"测试",emoji:"🧪"},{name:"部署上线",emoji:"🚀"}])}else if(e.action==="stage_update"){usv(e.index,e.status,e.agent);ud(e.agent,e.status)}else if(e.action==="demo_complete"){stp("完成")}}})}catch(e){}},200)}
+function stp(msg){if(pt){clearInterval(pt);pt=null}us(msg||"完成",false);document.getElementById("bs").disabled=false;running=false;document.querySelectorAll(".ad.running").forEach(function(d){d.classList.remove("running")})}
+function usv(i,s,a){var el=document.getElementById("ps-"+i);if(!el)return;el.className="ps "+s;el.querySelector(".pss").textContent={pending:"⬜",running:"⚡",completed:"✅",failed:"❌"}[s]||"⬜";var ae=document.getElementById("psa-"+i);if(ae&&a)ae.textContent="→ "+a.replace("Agent","").replace("-"," ").trim();document.getElementById("sp").textContent=document.querySelectorAll(".ps.completed").length?"Stage "+(parseInt(document.querySelectorAll(".ps.completed").length)+1)+"/"+document.querySelectorAll(".ps").length:""}
+function ud(id,s){var d=document.getElementById("ard-"+id);if(d)d.className="ad"+(s==="running"?" running":"")}
+function us(t,b){document.getElementById("ss").textContent=t;document.getElementById("sd").className=b?"sd busy":"sd"}
+function et(t){var d=document.createElement("div");d.textContent=t;return d.innerHTML}
+document.getElementById("ui").addEventListener("input",function(){this.style.height="auto";this.style.height=Math.min(this.scrollHeight,90)+"px"})
+document.addEventListener("click",function(e){if(!e.target.closest(".md"))document.getElementById("md").classList.remove("open")})
+setTimeout(function(){lm();la();lt();rl();us("就绪",false)},300);
+</script></body></html>

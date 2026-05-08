@@ -70,6 +70,46 @@ class LLMBridge:
     def is_configured(self) -> bool:
         return self._active_provider is not None
 
+    def complete_sync(self, model: str, messages: list[dict], max_tokens: int = 1024, temperature: float = 0.7) -> dict:
+        """Synchronous completion via the active provider (for use in threads)."""
+        import httpx
+        if not self._active_provider:
+            return {"content": "", "error": "No provider configured"}
+
+        provider = self._active_provider
+        base_url = getattr(provider, 'base_url', '').rstrip("/")
+        api_key = getattr(provider, 'api_key', '')
+        is_anthropic = isinstance(provider, __import__('omniagent.llm.providers.claude', fromlist=['ClaudeProvider']).ClaudeProvider) if hasattr(provider, '__class__') else False
+
+        try:
+            headers = {"Content-Type": "application/json", "User-Agent": "OmniAgent/0.2"}
+            if "anthropic" in base_url:
+                headers["x-api-key"] = api_key
+                headers["anthropic-version"] = "2023-06-01"
+                body = {"model": model, "max_tokens": max_tokens, "messages": messages}
+                url = f"{base_url}/messages"
+            else:
+                headers["Authorization"] = f"Bearer {api_key}"
+                body = {"model": model, "max_tokens": max_tokens, "temperature": temperature, "messages": messages}
+                url = f"{base_url}/chat/completions"
+
+            client = httpx.Client(timeout=60)
+            resp = client.post(url, json=body, headers=headers)
+            client.close()
+
+            if resp.status_code in (200, 201):
+                data = resp.json()
+                if "anthropic" in base_url:
+                    return {"content": data.get("content", [{}])[0].get("text", "")}
+                else:
+                    return {"content": data.get("choices", [{}])[0].get("message", {}).get("content", "")}
+            return {"content": "", "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+        except Exception as e:
+            return {"content": "", "error": str(e)}
+
+    def get_usage(self, model_id: str) -> dict:
+        return {"requests": 0, "input_tokens": 0, "output_tokens": 0, "cost": "$0.00"}
+
     @staticmethod
     def _get_model_info(model_id: str) -> dict | None:
         from ..gui.app import BUILTIN_MODELS
