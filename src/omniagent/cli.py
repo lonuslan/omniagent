@@ -2,7 +2,7 @@
 CLI entry point for OmniAgent Studio.
 
 Provides commands for:
-  - omniagent start  : Launch the desktop UI
+  - omniagent tui    : Launch the TUI dashboard (default)
   - omniagent run    : Run a task from the command line
   - omniagent agent  : Manage agents (list, install, create)
   - omniagent market : Search the agent marketplace
@@ -22,21 +22,39 @@ app = typer.Typer(
     help="OmniAgent Studio - Autonomous Multi-Agent Collaborative Platform",
 )
 
+# ── TUI ──────────────────────────────────────────────────────────────────────
+
+
+@app.command()
+def tui(
+    dry_run: bool = typer.Option(True, help="Run with simulated agents (no API keys needed)"),
+) -> None:
+    """Launch the OmniAgent TUI dashboard with multi-agent orchestration visualization."""
+    from .tui.demo import main as tui_main
+    if dry_run:
+        typer.echo("Launching OmniAgent Studio TUI (dry-run mode)...")
+    tui_main()
+
+
 # ── Start ────────────────────────────────────────────────────────────────────
 
 
 @app.command()
 def start(
+    tui_mode: bool = typer.Option(True, help="Launch TUI mode"),
     port: int = typer.Option(7860, help="Port for the web UI"),
     headless: bool = typer.Option(False, help="Run without UI"),
 ) -> None:
-    """Launch the OmniAgent Studio desktop application."""
-    if headless:
+    """Launch OmniAgent Studio."""
+    if tui_mode:
+        from .tui.demo import main as tui_main
+        tui_main()
+    elif headless:
         typer.echo("Starting OmniAgent in headless mode...")
         asyncio.run(_run_headless())
     else:
         typer.echo(f"Starting OmniAgent Studio on http://localhost:{port}")
-        typer.echo("(UI module: planned for Electron + React)")
+        typer.echo("(Web UI: planned for Electron + React)")
 
 
 # ── Run ─────────────────────────────────────────────────────────────────────
