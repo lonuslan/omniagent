@@ -246,6 +246,8 @@ body{font-family:var(--font);background:var(--bg-body);color:var(--text);height:
   <span class="sb-spacer"></span>
   <span id="sb-progress"></span>
   <span class="sb-spacer"></span>
+  <span id="sb-llm-status">🔌 LLM 未配置</span>
+  <span class="sb-spacer"></span>
   <span>5 Agents</span>
 </div>
 
@@ -394,8 +396,13 @@ async function loadTools(){
   }catch(e){}
 }
 
+async function refreshLLMStatus(){
+  try{const s=JSON.parse(await pywebview.api.get_llm_status());
+    document.getElementById('sb-llm-status').textContent = s.configured ? '🔌 LLM 已连接' : '🔌 LLM 未配置';
+  }catch(e){}
+}
 // Init
-loadModels();loadTools();updateStatus('就绪',false);
+loadModels();loadTools();updateStatus('就绪',false);refreshLLMStatus();
 </script>
 </body>
 </html>

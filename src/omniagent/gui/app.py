@@ -19,6 +19,7 @@ from ..core.workflow import SoftwareLifecycleWorkflow
 from ..protocol import Task
 from ..runtime.security import ExecutionMode, PermissionHandler, WorkspacePolicy
 from ..runtime.executor import ToolExecutor
+from ..core.llm_bridge import LLMBridge
 from ..tools.base import ToolRegistry
 from ..tools.builtin.file_tools import ReadTool, WriteTool, EditTool, GlobTool, GrepTool
 from ..tools.builtin.git_tools import GitStatusTool, GitDiffTool, GitLogTool, GitBranchTool
@@ -63,6 +64,7 @@ class OmniAgentAPI:
         self._permissions = PermissionHandler(self._mode)
         self._tool_executor: ToolExecutor | None = None
         self._model_configs: dict[str, dict] = {}  # model_id → {api_key, base_url}
+        self._llm_bridge = LLMBridge()
         self._setup_registry()
 
     def _setup_registry(self) -> None:
@@ -109,7 +111,11 @@ class OmniAgentAPI:
         if base_url:
             cfg["base_url"] = base_url
         self._model_configs[model_id] = cfg
-        return json.dumps({"status": "ok"})
+        try:
+            self._llm_bridge.configure(model_id, api_key, base_url)
+            return json.dumps({"status": "ok", "llm_ready": True})
+        except Exception as e:
+            return json.dumps({"status": "ok", "llm_ready": False, "warning": str(e)})
 
     def test_model_connection(self, model_id: str) -> str:
         cfg = self._model_configs.get(model_id)
@@ -165,6 +171,12 @@ class OmniAgentAPI:
                 "estimated_cost": "$0.00",
                 "note": "用量统计将在首次 API 调用后更新"
             }
+        })
+
+    def get_llm_status(self) -> str:
+        return json.dumps({
+            "configured": self._llm_bridge.is_configured(),
+            "providers": self._llm_bridge.list_configured(),
         })
 
     # ── Tools ──────────────────────────────────────────────────────────
