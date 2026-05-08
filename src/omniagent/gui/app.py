@@ -20,6 +20,9 @@ from ..protocol import Task
 from ..runtime.security import ExecutionMode, PermissionHandler, WorkspacePolicy
 from ..runtime.executor import ToolExecutor
 from ..tools.base import ToolRegistry
+from ..tools.builtin.file_tools import ReadTool, WriteTool, EditTool, GlobTool, GrepTool
+from ..tools.builtin.git_tools import GitStatusTool, GitDiffTool, GitLogTool, GitBranchTool
+from ..tools.builtin.web_tools import WebFetchTool, WebSearchTool
 
 
 # ── Built-in model definitions ──────────────────────────────────────────
@@ -69,6 +72,11 @@ class OmniAgentAPI:
             registry.register(temp.descriptor, cls)
         self._registry = registry
         tool_reg = ToolRegistry()
+        for t in [ReadTool(), WriteTool(), EditTool(), GlobTool(), GrepTool(),
+                   GitStatusTool(), GitDiffTool(), GitLogTool(), GitBranchTool(),
+                   WebFetchTool(), WebSearchTool()]:
+            tool_reg.register(t)
+        self._tool_registry = tool_reg
         self._tool_executor = ToolExecutor(tool_reg, self._permissions)
         config = OrchestratorConfig(max_retries_per_stage=2, parallel_stages=True)
         self._orchestrator = Orchestrator(registry, config=config)
@@ -158,6 +166,16 @@ class OmniAgentAPI:
                 "note": "用量统计将在首次 API 调用后更新"
             }
         })
+
+    # ── Tools ──────────────────────────────────────────────────────────
+
+    def get_tools(self) -> str:
+        if not hasattr(self, '_tool_registry'):
+            return "[]"
+        return json.dumps([{
+            "name": t.name, "description": t.description,
+            "category": t.category, "requires_approval": t.requires_approval,
+        } for t in self._tool_registry.list_descriptors()])
 
     # ── Agents ──────────────────────────────────────────────────────────
 

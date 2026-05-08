@@ -207,6 +207,7 @@ body{font-family:var(--font);background:var(--bg-body);color:var(--text);height:
     <div class="rp-tabs">
       <div class="rp-tab active" onclick="switchTab('agents')">🤖 Agents</div>
       <div class="rp-tab" onclick="switchTab('models')">🔑 模型</div>
+      <div class="rp-tab" onclick="switchTab('tools')">🔧 工具</div>
       <div class="rp-tab" onclick="switchTab('audit')">📋 审计</div>
     </div>
     <div class="rp-content">
@@ -223,6 +224,11 @@ body{font-family:var(--font);background:var(--bg-body);color:var(--text);height:
       <div class="rp-panel" id="rp-models">
         <div style="font-size:10px;color:var(--text3);padding:4px 2px 8px">选择模型 → 填入 API Key → 测试连接</div>
         <div id="model-list"></div>
+      </div>
+      <!-- Tools panel -->
+      <div class="rp-panel" id="rp-tools">
+        <div style="font-size:10px;color:var(--text3);padding:4px 2px 8px">Agent 可用工具集 (11 tools)</div>
+        <div id="tools-list"></div>
       </div>
       <!-- Audit panel -->
       <div class="rp-panel" id="rp-audit">
@@ -260,10 +266,9 @@ async function switchMode(mode) {
 }
 
 // ── Tabs ──
+const TAB_ORDER = ['agents','models','tools','audit'];
 function switchTab(tab) {
-  document.querySelectorAll('.rp-tab').forEach((t,i)=>{
-    t.classList.toggle('active', (tab==='agents'&&i===0)||(tab==='models'&&i===1)||(tab==='audit'&&i===2))
-  });
+  document.querySelectorAll('.rp-tab').forEach((t,i)=>{t.classList.toggle('active', TAB_ORDER[i]===tab)});
   document.querySelectorAll('.rp-panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('rp-'+tab).classList.add('active');
 }
@@ -369,8 +374,28 @@ function esc(t){const d=document.createElement('div');d.textContent=t;return d.i
 document.getElementById('user-input').addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,90)+'px'});
 document.addEventListener('click',e=>{if(!e.target.closest('.mode-dropdown'))document.getElementById('mode-dropdown').classList.remove('open')});
 
+// ── Tools ──
+async function loadTools(){
+  try{
+    const tools = JSON.parse(await pywebview.api.get_tools());
+    const el = document.getElementById('tools-list');
+    const cats = {file:'📁 文件',shell:'💻 Shell',web:'🌐 网络'};
+    el.innerHTML = tools.map(t=>`
+      <div style="padding:7px 10px;margin-bottom:2px;border-radius:6px;font-size:11px;transition:.15s"
+           onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-family:var(--mono);color:var(--accent);font-weight:600">${t.name}</span>
+          ${t.requires_approval?'<span style="font-size:9px;color:var(--warn)">需审批</span>':''}
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${t.description}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:2px">${cats[t.category]||t.category}</div>
+      </div>
+    `).join('');
+  }catch(e){}
+}
+
 // Init
-loadModels();updateStatus('就绪',false);
+loadModels();loadTools();updateStatus('就绪',false);
 </script>
 </body>
 </html>
