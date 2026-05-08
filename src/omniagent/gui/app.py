@@ -36,12 +36,15 @@ class OmniAgentAPI:
     The frontend calls these methods via:  window.pywebview.api.methodName()
     """
 
-    def __init__(self, window: webview.Window) -> None:
-        self._window = window
+    def __init__(self) -> None:
+        self._window: webview.Window | None = None
         self._registry: AgentRegistry | None = None
         self._orchestrator: Orchestrator | None = None
         self._running = False
         self._setup_registry()
+
+    def set_window(self, window: webview.Window) -> None:
+        self._window = window
 
     def _setup_registry(self) -> None:
         registry = AgentRegistry()
@@ -181,7 +184,7 @@ class OmniAgentAPI:
             )
 
             # Initialize pipeline in frontend
-            self._window.evaluate_js(f"initPipeline({len(sub_tasks)})")
+            self._js(f"initPipeline({len(sub_tasks)})")
             time.sleep(0.3)
 
             # Agent assignment
@@ -226,21 +229,21 @@ class OmniAgentAPI:
 
             for i, st in enumerate(sub_tasks):
                 agent_id = st.assigned_agent or "general-agent"
-                self._window.evaluate_js(f"setAgentStatus('{agent_id}', 'running')")
-                self._window.evaluate_js(f"setStageStatus({i}, 'running', '{agent_id}')")
+                self._js(f"setAgentStatus('{agent_id}', 'running')")
+                self._js(f"setStageStatus({i}, 'running', '{agent_id}')")
 
                 self._emit_event(agent_id, f"Starting: {stage_names[i]}", "thinking")
                 time.sleep(1.0)  # Simulate work
 
                 self._emit_event(agent_id, outputs[i], "success")
-                self._window.evaluate_js(f"setStageStatus({i}, 'completed')")
-                self._window.evaluate_js(f"setAgentStatus('{agent_id}', 'idle')")
+                self._js(f"setStageStatus({i}, 'completed')")
+                self._js(f"setAgentStatus('{agent_id}', 'idle')")
                 time.sleep(0.3)
 
             # Done
             self._emit_event("system", "🎉 Project completed! 7/7 stages done.", "success")
             self._emit_event("system", "Agents involved: 4 | All tests passing", "system")
-            self._window.evaluate_js("demoComplete()")
+            self._js("demoComplete()")
 
         except Exception as e:
             self._emit_event("system", f"Error: {e}", "error")
@@ -250,7 +253,12 @@ class OmniAgentAPI:
     def _emit_event(self, source: str, message: str, level: str) -> None:
         """Push an event to the frontend via JS evaluation."""
         escaped = message.replace("\\", "\\\\").replace("'", "\\'")
-        self._window.evaluate_js(f"addEvent('{source}', '{escaped}', '{level}')")
+        self._js(f"addEvent('{source}', '{escaped}', '{level}')")
+
+    def _js(self, code: str) -> None:
+        """Execute JS in the webview window, if available."""
+        if self._window:
+            self._js(code)
 
 
 def get_assets_dir() -> Path:
@@ -268,15 +276,17 @@ def launch_gui() -> None:
 
     html_content = html_path.read_text(encoding="utf-8")
 
+    api = OmniAgentAPI()
     window = webview.create_window(
         title="OmniAgent Studio — Multi-Agent Orchestration",
         html=html_content,
-        js_api=OmniAgentAPI(window),
+        js_api=api,
         width=1280,
         height=860,
         min_size=(960, 600),
         resizable=True,
         easy_drag=False,
     )
+    api.set_window(window)
 
     webview.start(debug=False, http_server=True)
