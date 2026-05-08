@@ -243,7 +243,7 @@ class OmniAgentAPI:
             # Done
             self._emit_event("system", "🎉 Project completed! 7/7 stages done.", "success")
             self._emit_event("system", "Agents involved: 4 | All tests passing", "system")
-            self._js("demoComplete()")
+            self._js_eval("demoComplete()")
 
         except Exception as e:
             self._emit_event("system", f"Error: {e}", "error")
@@ -253,12 +253,12 @@ class OmniAgentAPI:
     def _emit_event(self, source: str, message: str, level: str) -> None:
         """Push an event to the frontend via JS evaluation."""
         escaped = message.replace("\\", "\\\\").replace("'", "\\'")
-        self._js(f"addEvent('{source}', '{escaped}', '{level}')")
+        self._js_eval(f"addEvent('{source}', '{escaped}', '{level}')")
 
-    def _js(self, code: str) -> None:
+    def _js_eval(self, code: str) -> None:
         """Execute JS in the webview window, if available."""
         if self._window:
-            self._js(code)
+            self._window.evaluate_js(code)
 
 
 def get_assets_dir() -> Path:
