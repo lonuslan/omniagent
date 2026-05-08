@@ -35,8 +35,8 @@ def capability_match_score(
     matched = required_set & offered_set
     precision = len(matched) / len(required_set) if required_set else 0
     # Small bonus for additional capabilities beyond what's required
-    extra = len(offered_set - required_set) * 0.05
-    return min(1.0, precision + extra)
+    extra = len(offered_set - required_set) * 0.02
+    return precision + extra
 
 
 # ── Registry ─────────────────────────────────────────────────────────────────
