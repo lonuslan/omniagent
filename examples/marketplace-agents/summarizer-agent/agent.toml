@@ -1,0 +1,8 @@
+id = "summarizer-agent"
+name = "Text Summarizer Agent"
+version = "1.0.0"
+author = "omniagent-team"
+description = "Summarizes long documents into concise overviews"
+capabilities = ["documentation", "general_purpose"]
+entry_point = "agent.py"
+tags = ["text", "summary", "nlp"]

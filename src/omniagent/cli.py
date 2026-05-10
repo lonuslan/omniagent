@@ -118,17 +118,161 @@ def create_agent(
 
 # ── Marketplace ──────────────────────────────────────────────────────────────
 
-market_app = typer.Typer(help="Search the agent marketplace")
+market_app = typer.Typer(help="Search, install, and manage marketplace agents")
 app.add_typer(market_app, name="market")
 
 
 @market_app.command("search")
 def market_search(
-    query: str = typer.Argument(..., help="Search query for agents/skills"),
+    query: str = typer.Argument(..., help="Search query for agents"),
+    capabilities: str = typer.Option("", help="Comma-separated capability filters"),
 ) -> None:
-    """Search the agent marketplace for available agents and skills."""
-    typer.echo(f"Searching marketplace for: {query}")
-    typer.echo("(Marketplace integration planned)")
+    """Search the agent marketplace for available agents."""
+    from .marketplace.registry import GitHubRegistry
+
+    cap_list = [c.strip() for c in capabilities.split(",") if c.strip()] if capabilities else None
+    registry = GitHubRegistry()
+    results = registry.search(query, cap_list)
+    if not results:
+        typer.echo("No agents found.")
+        return
+    typer.echo(f"Found {len(results)} agent(s):\n")
+    for e in results:
+        rating = f" ({e.rating:.1f}/5)" if e.rating_count > 0 else ""
+        typer.echo(f"  {e.id} v{e.version}{rating}")
+        typer.echo(f"    {e.description}")
+        typer.echo(f"    capabilities: {', '.join(e.capabilities)}")
+        typer.echo()
+
+
+@market_app.command("list")
+def market_list() -> None:
+    """List all installed marketplace agents."""
+    from .marketplace.installer import list_installed
+
+    packages = list_installed()
+    if not packages:
+        typer.echo("No marketplace agents installed.")
+        return
+    typer.echo(f"Installed agents ({len(packages)}):\n")
+    for pkg in packages:
+        typer.echo(f"  {pkg.id} v{pkg.version} — {pkg.name}")
+        typer.echo(f"    {pkg.description}")
+        typer.echo()
+
+
+@market_app.command("info")
+def market_info(
+    agent_id: str = typer.Argument(..., help="Agent ID to inspect"),
+) -> None:
+    """Show detailed information about a marketplace agent."""
+    from .marketplace.installer import is_installed
+    from .marketplace.registry import GitHubRegistry
+
+    registry = GitHubRegistry()
+    entry = registry.get(agent_id)
+    if not entry:
+        typer.echo(f"Agent not found: {agent_id}")
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Agent: {entry.name} (v{entry.version})")
+    typer.echo(f"ID: {entry.id}")
+    typer.echo(f"Author: {entry.author}")
+    typer.echo(f"Description: {entry.description}")
+    typer.echo(f"Capabilities: {', '.join(entry.capabilities)}")
+    typer.echo(f"Tags: {', '.join(entry.tags) if entry.tags else 'none'}")
+    if entry.rating_count > 0:
+        typer.echo(f"Rating: {entry.rating:.1f}/5 ({entry.rating_count} reviews)")
+    if entry.git_url:
+        typer.echo(f"Git URL: {entry.git_url}")
+    installed = "Yes" if is_installed(agent_id) else "No"
+    typer.echo(f"Installed: {installed}")
+
+
+@market_app.command("install")
+def market_install(
+    agent_id: str = typer.Argument(..., help="Agent ID or git URL to install"),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing installation"),
+) -> None:
+    """Install an agent from the marketplace or a git URL."""
+    from .marketplace.installer import install_from_git, is_installed
+    from .marketplace.registry import GitHubRegistry
+
+    # Check if it's a git URL
+    if agent_id.startswith("http") or agent_id.startswith("git@"):
+        typer.echo(f"Installing from git: {agent_id}")
+        try:
+            pkg = install_from_git(agent_id, force=force)
+            typer.echo(f"Installed {pkg.id} v{pkg.version}")
+        except Exception as e:
+            typer.echo(f"Install failed: {e}")
+            raise typer.Exit(code=1)
+        return
+
+    # Look up in registry
+    registry = GitHubRegistry()
+    entry = registry.get(agent_id)
+    if not entry:
+        typer.echo(f"Agent not found in marketplace: {agent_id}")
+        raise typer.Exit(code=1)
+    if not entry.git_url:
+        typer.echo(f"Agent has no git_url: {agent_id}")
+        raise typer.Exit(code=1)
+    if is_installed(agent_id) and not force:
+        typer.echo(f"Already installed: {agent_id}. Use --force to reinstall.")
+        return
+
+    typer.echo(f"Installing {entry.name} from {entry.git_url}...")
+    try:
+        pkg = install_from_git(entry.git_url, agent_id=agent_id, force=force)
+        typer.echo(f"Installed {pkg.id} v{pkg.version}")
+    except Exception as e:
+        typer.echo(f"Install failed: {e}")
+        raise typer.Exit(code=1)
+
+
+@market_app.command("uninstall")
+def market_uninstall(
+    agent_id: str = typer.Argument(..., help="Agent ID to uninstall"),
+) -> None:
+    """Uninstall a marketplace agent."""
+    from .marketplace.installer import uninstall
+
+    if uninstall(agent_id):
+        typer.echo(f"Uninstalled: {agent_id}")
+    else:
+        typer.echo(f"Agent not installed: {agent_id}")
+        raise typer.Exit(code=1)
+
+
+@market_app.command("rate")
+def market_rate(
+    agent_id: str = typer.Argument(..., help="Agent ID to rate"),
+    score: int = typer.Argument(..., help="Rating score (1-5)"),
+    comment: str = typer.Option("", "--comment", "-c", help="Review comment"),
+) -> None:
+    """Rate a marketplace agent (1-5)."""
+    import time
+
+    from .marketplace.models import Review
+    from .marketplace.registry import LocalRegistry
+
+    if score < 1 or score > 5:
+        typer.echo("Score must be between 1 and 5.")
+        raise typer.Exit(code=1)
+
+    local = LocalRegistry()
+    review = Review(
+        agent_id=agent_id,
+        user="cli-user",
+        score=score,
+        comment=comment,
+        timestamp=time.time(),
+    )
+    local.add_review(review)
+    avg, count = local.get_rating(agent_id)
+    typer.echo(f"Rated {agent_id}: {score}/5")
+    typer.echo(f"Average: {avg:.1f}/5 ({count} reviews)")
 
 
 # ── Internals ────────────────────────────────────────────────────────────────
@@ -143,7 +287,7 @@ async def _execute_task(task: Task) -> None:
     _register_builtins(registry)
 
     orch = Orchestrator(registry)
-    task = await orch.submit(task)
+    task, analysis = await orch.submit(task)
     events = await orch.execute(task)
 
     for event in events:

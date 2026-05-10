@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from typing import Callable
+from typing import Any, Callable
 
 from ..protocol import AgentCapability, AgentDescriptor, AgentRole, IAgent
 
@@ -162,27 +162,58 @@ class AgentRegistry:
 
 class MarketplaceAdapter:
     """
-    Adapter for connecting to external agent/skill marketplaces.
+    Adapter for connecting to the OmniAgent marketplace.
 
-    Implementations could support:
-      - GitHub agent repositories
-      - Community skill registries
-      - Enterprise agent catalogs
+    Delegates to GitHubRegistry (remote index) and LocalRegistry (local JSON).
+    Converts MarketplaceEntry to AgentDescriptor for registry integration.
     """
 
-    def __init__(self, name: str, base_url: str) -> None:
+    def __init__(self, name: str = "omniagent-marketplace", base_url: str = "") -> None:
         self.name = name
         self.base_url = base_url
+        self._github: Any = None
+        self._local: Any = None
+
+    def _ensure_registry(self) -> Any:
+        if self._github is None:
+            from ..marketplace.registry import GitHubRegistry, LocalRegistry
+            self._local = LocalRegistry()
+            self._github = GitHubRegistry(local=self._local)
+        return self._github
 
     async def search(
         self,
         query: str,
         capabilities: list[AgentCapability] | None = None,
     ) -> list[AgentDescriptor]:
-        """Search this marketplace for agents."""
-        # TODO: Implement HTTP search against marketplace API
-        return []
+        """Search the marketplace for agents matching query and capabilities."""
+        registry = self._ensure_registry()
+        cap_strs = [c.value for c in capabilities] if capabilities else None
+        entries = registry.search(query, cap_strs)
+        return [_entry_to_descriptor(e) for e in entries]
 
     async def fetch(self, agent_id: str) -> AgentDescriptor | None:
-        """Fetch a specific agent from this marketplace."""
-        return None
+        """Fetch a specific agent from the marketplace."""
+        registry = self._ensure_registry()
+        entry = registry.get(agent_id)
+        return _entry_to_descriptor(entry) if entry else None
+
+
+def _entry_to_descriptor(entry: Any) -> AgentDescriptor:
+    """Convert a MarketplaceEntry to an AgentDescriptor."""
+    caps = []
+    for cap_str in entry.capabilities:
+        try:
+            caps.append(AgentCapability(cap_str))
+        except ValueError:
+            caps.append(AgentCapability.GENERAL_PURPOSE)
+    return AgentDescriptor(
+        id=entry.id,
+        name=entry.name,
+        version=entry.version,
+        capabilities=caps,
+        role=AgentRole.EXECUTOR,
+        description=entry.description,
+        provider="marketplace",
+        metadata={"author": entry.author, "tags": entry.tags},
+    )
