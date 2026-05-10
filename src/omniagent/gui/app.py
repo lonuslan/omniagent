@@ -127,6 +127,10 @@ BUILTIN_MODELS = [
 ]
 
 
+_CONFIG_DIR = Path.home() / ".omniagent"
+_CONFIG_PATH = _CONFIG_DIR / "gui_config.json"
+
+
 class OmniAgentAPI:
     """JS <-> Python bridge for pywebview."""
 
@@ -145,7 +149,43 @@ class OmniAgentAPI:
         self._llm_bridge = LLMBridge()
         self._pending_approvals: list[dict] = []
         self._conversation_history: list[dict] = []
+        self._load_persisted_config()
         self._setup_registry()
+        self._auto_activate_model()
+
+    # ── Config Persistence ──────────────────────────────────────────────
+
+    def _load_persisted_config(self) -> None:
+        """Load saved model configs from disk."""
+        if _CONFIG_PATH.exists():
+            try:
+                data = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+                self._model_configs = data.get("model_configs", {})
+                self._active_model_id = data.get("active_model", "")
+            except Exception:
+                pass
+
+    def _save_persisted_config(self) -> None:
+        """Save current model configs to disk."""
+        _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        data = {
+            "model_configs": self._model_configs,
+            "active_model": self._active_model_id,
+        }
+        _CONFIG_PATH.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    def _auto_activate_model(self) -> None:
+        """Auto-activate the previously selected model if config is available."""
+        if self._active_model_id:
+            cfg = self._model_configs.get(self._active_model_id)
+            if cfg and cfg.get("api_key"):
+                self._llm_bridge.configure(self._active_model_id, cfg["api_key"], cfg.get("base_url", ""))
+                provider = self._llm_bridge.get_provider()
+                if provider and self._orchestrator:
+                    self._orchestrator.analyzer = TaskAnalyzer(llm_provider=provider)
 
     def _setup_registry(self) -> None:
         registry = AgentRegistry()
@@ -223,6 +263,7 @@ class OmniAgentAPI:
                 "max_tokens": cfg.get("max_tokens", 4096),
                 "temperature": cfg.get("temperature", 0.7),
             }
+            self._save_persisted_config()
             return json.dumps({"status": "ok"})
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
@@ -237,6 +278,7 @@ class OmniAgentAPI:
         provider = self._llm_bridge.get_provider()
         if provider and self._orchestrator:
             self._orchestrator.analyzer = TaskAnalyzer(llm_provider=provider)
+        self._save_persisted_config()
         return json.dumps({"status": "ok", "active_model": model_id})
 
     def test_model_connection(self, model_id: str) -> str:
