@@ -12,7 +12,25 @@ const state = {
     pipelineCreated: false,
     pollErrors: 0,
     maxPollErrors: 5,
+    currentAgent: '',
+    conversations: [],
+    activeConversationId: null,
 };
+
+// ── Agent Identity Map ─────────────────────────────────────────────
+const AGENT_MAP = {
+    'general-agent':      { name: 'General',    emoji: '🤖', color: 'agent-general' },
+    'code-gen-agent':     { name: 'CodeGen',    emoji: '💻', color: 'agent-codegen' },
+    'code-review-agent':  { name: 'Review',     emoji: '🔍', color: 'agent-review' },
+    'doc-writer-agent':   { name: 'DocWriter',  emoji: '📝', color: 'agent-doc' },
+    'test-agent':         { name: 'Test',       emoji: '🧪', color: 'agent-test' },
+};
+
+function getAgentInfo(agentId) {
+    if (!agentId) return { name: 'Agent', emoji: '🎯', color: '' };
+    const key = agentId.toLowerCase().replace(/[_\s]+/g, '-');
+    return AGENT_MAP[key] || { name: agentId, emoji: '🎯', color: '' };
+}
 
 // ── API Wrapper ────────────────────────────────────────────────────
 async function api(method, ...args) {
@@ -37,6 +55,28 @@ function renderMarkdown(text) {
         return `<div class="code-block"><div class="code-header"><span>${langLabel}</span><button class="copy-btn" onclick="copyCode('${blockId}')">Copy</button></div><pre><code id="${blockId}">${code.trimEnd()}</code></pre></div>`;
     });
 
+    // Tables
+    s = s.replace(/^(\|.+\|)\n(\|[-| :]+\|)\n((?:\|.+\|\n?)+)/gm, (_, header, sep, body) => {
+        const ths = header.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+        const rows = body.trim().split('\n').map(row => {
+            const tds = row.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+            return `<tr>${tds}</tr>`;
+        }).join('');
+        return `<table class="md-table"><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
+    });
+
+    // Horizontal rules
+    s = s.replace(/^---+$/gm, '<hr class="md-hr">');
+
+    // Blockquotes
+    s = s.replace(/^> (.+)$/gm, '<blockquote class="md-blockquote">$1</blockquote>');
+    s = s.replace(/(<blockquote class="md-blockquote">.*<\/blockquote>\n?)+/g, '<div class="md-blockquotes">$&</div>');
+
+    // Headings (h1-h3)
+    s = s.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+    s = s.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+    s = s.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+
     // Inline code
     s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
     // Bold
@@ -45,7 +85,9 @@ function renderMarkdown(text) {
     s = s.replace(/(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
     // Links
     s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" style="color:var(--ac)">$1</a>');
-    // Lists
+    // Ordered lists
+    s = s.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+    // Unordered lists
     s = s.replace(/^- (.+)$/gm, '<li>$1</li>');
     s = s.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
     // Paragraphs
@@ -53,6 +95,11 @@ function renderMarkdown(text) {
     s = s.replace(/\n/g, '<br>');
 
     return `<p>${s}</p>`;
+}
+
+function isLongFormMarkdown(text) {
+    if (!text || text.length < 200) return false;
+    return /^#{1,3} |^\|.*\|.*\|/m.test(text) || text.includes('```') || text.split('\n').length > 8;
 }
 
 function copyCode(id) {
@@ -81,15 +128,30 @@ function addUserMessage(text) {
     scrollToBottom();
 }
 
-function addAssistantMessage(text, agentName, emoji) {
+function addAssistantMessage(text, agentName, emoji, agentId) {
     const container = document.getElementById('messages');
+    const info = getAgentInfo(agentId);
+    const displayName = agentName || info.name;
+    const displayEmoji = emoji || info.emoji;
+
+    // Agent transition divider
+    if (agentId && agentId !== state.currentAgent && state.currentAgent !== '') {
+        const trans = document.createElement('div');
+        trans.className = 'agent-transition';
+        trans.innerHTML = `<span class="agent-transition-badge ${info.color}">${displayEmoji} ${escapeHtml(displayName)}</span>`;
+        container.appendChild(trans);
+    }
+    if (agentId) state.currentAgent = agentId;
+
     const div = document.createElement('div');
-    div.className = 'message assistant';
+    div.className = `message assistant${info.color ? ' ' + info.color : ''}`;
+    const longForm = isLongFormMarkdown(text);
+    const bubbleClass = longForm ? 'bubble doc-bubble' : 'bubble';
     div.innerHTML = `
-        <div class="avatar">${emoji || '🎯'}</div>
-        <div class="body">
-            <div class="source">${escapeHtml(agentName || 'Agent')}</div>
-            <div class="bubble">${renderMarkdown(text)}</div>
+        <div class="avatar ${info.color}">${displayEmoji}</div>
+        <div class="body" ${longForm ? 'style="max-width:100%;flex:1"' : ''}>
+            <div class="source">${escapeHtml(displayName)}</div>
+            <div class="${bubbleClass}">${renderMarkdown(text)}</div>
         </div>`;
     container.appendChild(div);
     scrollToBottom();
@@ -115,11 +177,15 @@ function addToolCallCard(tool, args, result, isError) {
     const div = document.createElement('div');
     div.className = 'tool-call';
     const argsStr = typeof args === 'object' ? JSON.stringify(args, null, 2) : String(args);
+    const iconMap = { read: '📖', write: '✏️', edit: '✏️', glob: '📂', grep: '🔍', web_search: '🔍', web_fetch: '🌐', git_status: '📋', git_diff: '📋', git_log: '📋', git_branch: '📋' };
+    const icon = iconMap[tool] || '⚙️';
+    const preview = typeof args === 'object' ? (args.path || args.query || args.url || args.pattern || '') : '';
     div.innerHTML = `
         <div class="tool-call-header" onclick="this.parentElement.classList.toggle('open')">
-            <span class="tool-icon">🔧</span>
+            <span class="tool-icon">${icon}</span>
             <span class="tool-name">${escapeHtml(tool)}</span>
-            <span class="tool-status ${isError ? 'error' : 'success'}">${isError ? 'Error' : 'OK'}</span>
+            ${preview ? `<span class="tool-preview">${escapeHtml(String(preview).slice(0, 60))}</span>` : ''}
+            <span class="tool-status ${isError ? 'error' : 'success'}">${isError ? '✗' : '✓'}</span>
             <span class="chevron">▶</span>
         </div>
         <div class="tool-call-body">
@@ -225,7 +291,7 @@ function startPolling() {
                         }
                     } else {
                         const emoji = { system: '🤖', thinking: '🔍', success: '✅', warning: '⚠️', error: '❌', info: 'ℹ️' }[e.level] || '🎯';
-                        addAssistantMessage(e.message, (e.source || 'system').toUpperCase(), emoji);
+                        addAssistantMessage(e.message, (e.source || 'system').toUpperCase(), emoji, e.agent_id || '');
                     }
                 } else if (e.type === 'action') {
                     if (e.action === 'init_pipeline' && !state.pipelineCreated) {
@@ -260,6 +326,11 @@ function stopPolling(msg) {
     document.getElementById('stop-btn').classList.remove('visible');
     state.running = false;
     state.pipelineCreated = false;
+    state.currentAgent = '';
+    // Auto-save conversation on task complete
+    if (state.activeConversationId) {
+        saveCurrentConversation().then(() => loadConversations());
+    }
 }
 
 // ── Task Submission ────────────────────────────────────────────────
@@ -268,6 +339,14 @@ async function submitTask(text) {
     const input = document.getElementById('user-input');
     input.value = '';
     input.style.height = 'auto';
+
+    // Auto-create conversation if none active
+    if (!state.activeConversationId && !text.trim().startsWith('/')) {
+        try {
+            const r = await api('create_conversation', text.trim().slice(0, 50));
+            if (r.status === 'ok') state.activeConversationId = r.id;
+        } catch (e) { /* ignore */ }
+    }
 
     // Show user message (unless it's a command)
     if (!text.trim().startsWith('/')) {
@@ -769,6 +848,172 @@ function scrollToBottom() {
     area.scrollTop = area.scrollHeight;
 }
 
+// ── Conversations Panel ────────────────────────────────────────────
+async function loadConversations() {
+    try {
+        const convs = await api('get_conversations_list');
+        state.conversations = Array.isArray(convs) ? convs : [];
+        renderConversationList();
+    } catch (e) { /* ignore */ }
+}
+
+function renderConversationList() {
+    const list = document.getElementById('conversation-list');
+    if (!list) return;
+    if (state.conversations.length === 0) {
+        list.innerHTML = '<div class="empty-hint">No conversations yet.</div>';
+        return;
+    }
+    list.innerHTML = state.conversations.map(c => {
+        const active = c.id === state.activeConversationId ? ' active' : '';
+        const date = new Date(c.created_at * 1000).toLocaleDateString();
+        return `<div class="conv-item${active}" onclick="switchConversation('${c.id}')">
+            <div class="conv-title">${escapeHtml(c.title)}</div>
+            <div class="conv-date">${date}</div>
+            <button class="conv-delete" onclick="event.stopPropagation(); deleteConversation('${c.id}')" title="Delete">&times;</button>
+        </div>`;
+    }).join('');
+}
+
+async function createConversation() {
+    try {
+        const r = await api('create_conversation', 'New Chat');
+        if (r.status === 'ok') {
+            state.activeConversationId = r.id;
+            document.getElementById('messages').innerHTML = '';
+            state.pipelineCreated = false;
+            await loadConversations();
+            switchPanel('chat');
+        }
+    } catch (e) { /* ignore */ }
+}
+
+async function switchConversation(id) {
+    // Save current conversation messages
+    await saveCurrentConversation();
+    state.activeConversationId = id;
+    const conv = state.conversations.find(c => c.id === id);
+    if (!conv) return;
+
+    // Restore messages
+    const container = document.getElementById('messages');
+    container.innerHTML = '';
+    state.pipelineCreated = false;
+    state.currentAgent = '';
+
+    for (const m of (conv.messages || [])) {
+        if (m.role === 'user') {
+            addUserMessage(m.content);
+        } else if (m.role === 'assistant') {
+            addAssistantMessage(m.content, m.agent, m.emoji, m.agent_id);
+        }
+    }
+    renderConversationList();
+    switchPanel('chat');
+}
+
+async function saveCurrentConversation() {
+    if (!state.activeConversationId) return;
+    const msgEls = document.querySelectorAll('#messages > .message');
+    const messages = [];
+    for (const el of msgEls) {
+        if (el.classList.contains('user')) {
+            const bubble = el.querySelector('.bubble');
+            if (bubble) messages.push({ role: 'user', content: bubble.textContent });
+        } else if (el.classList.contains('assistant')) {
+            const bubble = el.querySelector('.bubble');
+            const source = el.querySelector('.source');
+            if (bubble) messages.push({
+                role: 'assistant',
+                content: bubble.textContent,
+                agent: source ? source.textContent : '',
+            });
+        }
+    }
+    // Auto-title from first user message
+    let title = '';
+    const firstUser = messages.find(m => m.role === 'user');
+    if (firstUser) title = firstUser.content.slice(0, 50);
+
+    try {
+        await api('save_conversation', state.activeConversationId, JSON.stringify(messages), title);
+    } catch (e) { /* ignore */ }
+}
+
+async function deleteConversation(id) {
+    try {
+        await api('delete_conversation', id);
+        if (state.activeConversationId === id) {
+            state.activeConversationId = null;
+            document.getElementById('messages').innerHTML = '';
+        }
+        await loadConversations();
+    } catch (e) { /* ignore */ }
+}
+
+// ── Workspace Panel ────────────────────────────────────────────────
+async function loadWorkspace() {
+    try {
+        const r = await api('list_workspace_files');
+        if (r.status !== 'ok') return;
+        document.getElementById('workspace-root').textContent = r.root || '';
+        const tree = document.getElementById('file-tree');
+        tree.innerHTML = renderFileTree(r.files || [], '');
+    } catch (e) { /* ignore */ }
+}
+
+function renderFileTree(items, prefix) {
+    return items.map(item => {
+        if (item.is_dir) {
+            const children = item.children || [];
+            return `<div class="tree-dir">
+                <div class="tree-item" onclick="this.parentElement.classList.toggle('open')">
+                    <span class="tree-icon">📁</span>
+                    <span class="tree-name">${escapeHtml(item.name)}</span>
+                </div>
+                <div class="tree-children">${renderFileTree(children, prefix + item.name + '/')}</div>
+            </div>`;
+        }
+        const iconMap = { '.py': '🐍', '.js': '📜', '.ts': '📘', '.html': '🌐', '.css': '🎨', '.md': '📝', '.json': '📋', '.toml': '📋', '.yaml': '📋', '.yml': '📋', '.txt': '📄', '.sh': '💻', '.bat': '💻' };
+        const icon = iconMap[item.ext] || '📄';
+        const path = item.path;
+        return `<div class="tree-item tree-file" onclick="openFile('${escapeHtml(path)}')">
+            <span class="tree-icon">${icon}</span>
+            <span class="tree-name">${escapeHtml(item.name)}</span>
+        </div>`;
+    }).join('');
+}
+
+async function openFile(relPath) {
+    try {
+        const r = await api('read_file_content', relPath);
+        if (r.status !== 'ok') return;
+        document.getElementById('file-viewer-name').textContent = relPath;
+        document.getElementById('file-viewer-content').textContent = r.content;
+        document.getElementById('file-viewer').classList.remove('hidden');
+    } catch (e) { /* ignore */ }
+}
+
+function closeFileViewer() {
+    document.getElementById('file-viewer').classList.add('hidden');
+}
+
+function refreshWorkspace() {
+    loadWorkspace();
+}
+
+// ── Panel Switching ────────────────────────────────────────────────
+function switchPanel(panel) {
+    // Toggle sidebar active state
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.panel === panel);
+    });
+    // Toggle panels
+    document.getElementById('conversations-panel').classList.toggle('hidden', panel !== 'conversations');
+    document.getElementById('workspace-panel').classList.toggle('hidden', panel !== 'workspace');
+    // Chat is always visible (main area)
+}
+
 // ── Event Listeners ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('user-input');
@@ -798,6 +1043,20 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('settings-close').addEventListener('click', closeSettings);
     document.querySelector('.modal-backdrop')?.addEventListener('click', closeSettings);
 
+    // Sidebar panel switching
+    document.getElementById('conversations-btn').addEventListener('click', () => {
+        const panel = document.getElementById('conversations-panel');
+        const isHidden = panel.classList.contains('hidden');
+        switchPanel(isHidden ? 'conversations' : 'chat');
+        if (isHidden) loadConversations();
+    });
+    document.getElementById('workspace-btn').addEventListener('click', () => {
+        const panel = document.getElementById('workspace-panel');
+        const isHidden = panel.classList.contains('hidden');
+        switchPanel(isHidden ? 'workspace' : 'chat');
+        if (isHidden) loadWorkspace();
+    });
+
     document.querySelectorAll('.modal-tab').forEach(tab => {
         tab.addEventListener('click', () => switchTab(tab.dataset.tab));
     });
@@ -807,6 +1066,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadAgents();
         loadTools();
         refreshStatus();
+        loadConversations();
         setStatus('Ready', false);
     }, 300);
 });

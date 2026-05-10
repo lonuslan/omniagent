@@ -1082,6 +1082,150 @@ class OmniAgentAPI:
         self._auth.logout(token)
         return json.dumps({"status": "ok"})
 
+    # ── Conversations ───────────────────────────────────────────────────
+
+    _CONV_PATH = _CONFIG_DIR / "conversations.json"
+
+    def _load_conversations(self) -> list[dict]:
+        if self._CONV_PATH.exists():
+            try:
+                return json.loads(self._CONV_PATH.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        return []
+
+    def _save_conversations(self, convs: list[dict]) -> None:
+        _CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        self._CONV_PATH.write_text(
+            json.dumps(convs, indent=2, ensure_ascii=False), encoding="utf-8",
+        )
+
+    def get_conversations_list(self) -> str:
+        """Return all saved conversations."""
+        return json.dumps(self._load_conversations())
+
+    def create_conversation(self, title: str = "New Chat") -> str:
+        """Create a new conversation. Returns conversation ID."""
+        import uuid
+        convs = self._load_conversations()
+        conv = {
+            "id": str(uuid.uuid4()),
+            "title": title,
+            "created_at": time.time(),
+            "messages": [],
+        }
+        convs.insert(0, conv)
+        self._save_conversations(convs)
+        return json.dumps({"status": "ok", "id": conv["id"]})
+
+    def save_conversation(self, conv_id: str, messages_json: str, title: str = "") -> str:
+        """Save messages to a conversation."""
+        try:
+            convs = self._load_conversations()
+            for c in convs:
+                if c["id"] == conv_id:
+                    c["messages"] = json.loads(messages_json)
+                    if title:
+                        c["title"] = title
+                    break
+            self._save_conversations(convs)
+            return json.dumps({"status": "ok"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def delete_conversation(self, conv_id: str) -> str:
+        """Delete a conversation."""
+        convs = self._load_conversations()
+        convs = [c for c in convs if c["id"] != conv_id]
+        self._save_conversations(convs)
+        return json.dumps({"status": "ok"})
+
+    # ── Workspace ───────────────────────────────────────────────────────
+
+    def get_workspace_root(self) -> str:
+        """Return the current workspace root directory."""
+        import os
+        cwd = os.getcwd()
+        # Walk up to find project root
+        d = cwd
+        for _ in range(10):
+            markers = [".git", "pyproject.toml", "package.json", "Cargo.toml", "go.mod"]
+            if any((Path(d) / m).exists() for m in markers):
+                return json.dumps({"status": "ok", "path": d})
+            parent = str(Path(d).parent)
+            if parent == d:
+                break
+            d = parent
+        return json.dumps({"status": "ok", "path": cwd})
+
+    def set_workspace_root(self, path: str) -> str:
+        """Set the workspace root directory."""
+        p = Path(path)
+        if not p.is_dir():
+            return json.dumps({"status": "error", "message": "Not a directory"})
+        import os as _os
+        _os.chdir(str(p))
+        return json.dumps({"status": "ok", "path": str(p)})
+
+    def list_workspace_files(self, rel_path: str = "", max_depth: int = 3) -> str:
+        """List files in workspace directory tree."""
+        try:
+            import os
+            root_str = json.loads(self.get_workspace_root())["path"]
+            root = Path(root_str)
+            target = root / rel_path if rel_path else root
+            if not target.is_dir():
+                return json.dumps({"status": "error", "message": "Not a directory"})
+
+            skip = {".git", "__pycache__", "node_modules", ".venv", ".omniagent", ".pytest_cache", ".mypy_cache"}
+
+            def scan(dir_path: Path, depth: int) -> list[dict]:
+                if depth > max_depth:
+                    return []
+                items = []
+                try:
+                    entries = sorted(dir_path.iterdir(), key=lambda e: (not e.is_dir(), e.name.lower()))
+                except PermissionError:
+                    return []
+                for entry in entries:
+                    if entry.name.startswith(".") and entry.name not in (".env", ".gitignore"):
+                        if entry.name in skip:
+                            continue
+                    if entry.name in skip:
+                        continue
+                    item = {
+                        "name": entry.name,
+                        "path": str(entry.relative_to(root)),
+                        "is_dir": entry.is_dir(),
+                    }
+                    if entry.is_dir():
+                        item["children"] = scan(entry, depth + 1)
+                    else:
+                        item["size"] = entry.stat().st_size
+                        ext = entry.suffix.lower()
+                        item["ext"] = ext
+                    items.append(item)
+                return items
+
+            tree = scan(target, 0)
+            return json.dumps({"status": "ok", "root": str(root), "files": tree})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def read_file_content(self, rel_path: str) -> str:
+        """Read file content for preview."""
+        try:
+            root_str = json.loads(self.get_workspace_root())["path"]
+            full_path = Path(root_str) / rel_path
+            if not full_path.is_file():
+                return json.dumps({"status": "error", "message": "File not found"})
+            if full_path.stat().st_size > 500_000:
+                return json.dumps({"status": "error", "message": "File too large (>500KB)"})
+            content = full_path.read_text(encoding="utf-8", errors="replace")
+            return json.dumps({"status": "ok", "content": content, "path": rel_path})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
 
 def get_assets_dir() -> Path:
     return Path(__file__).parent / "assets"
