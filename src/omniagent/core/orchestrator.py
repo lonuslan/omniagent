@@ -59,12 +59,14 @@ class Orchestrator:
         config: OrchestratorConfig | None = None,
         llm_provider: Any | None = None,
         llm_bridge: Any | None = None,
+        skill_registry: Any | None = None,
     ) -> None:
         self.registry = registry
         self.runtime = runtime_pool
         self.config = config or OrchestratorConfig()
         self.analyzer = TaskAnalyzer(llm_provider=llm_provider)
         self.workflow_registry = WorkflowRegistry()
+        self.skill_registry = skill_registry
         self.scorer = AgentScorer(llm_bridge=llm_bridge)
         self.negotiator = NegotiationProtocol(llm_bridge=llm_bridge)
         self.stream = EventStream()
@@ -361,6 +363,19 @@ class Orchestrator:
                 else:
                     summaries.append(f"[{output['stage']}] by {output['agent']} — {output['status']}")
             sub_task.context["previous_outputs"] = summaries
+
+        # Inject skill instructions from matching enabled skills
+        if self.skill_registry:
+            active_skills = self.skill_registry.find_by_capability(
+                [c.value for c in sub_task.required_capabilities]
+            )
+            if active_skills:
+                skill_text = "\n\n".join(
+                    s.manifest.instructions for s in active_skills
+                    if s.manifest.instructions
+                )
+                if skill_text:
+                    sub_task.context["skill_instructions"] = skill_text
 
         if not sub_task.assigned_agent:
             return [AgentEvent(

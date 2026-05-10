@@ -202,6 +202,13 @@ class OmniAgentAPI:
         self._tool_executor = ToolExecutor(tool_reg, self._permissions)
         config = OrchestratorConfig(max_retries_per_stage=2, parallel_stages=True)
         self._orchestrator = Orchestrator(registry, config=config, llm_bridge=self._llm_bridge)
+        # Skill registry
+        from ..skills.registry import SkillRegistry
+        from ..skills.scanner import SkillScanner
+        self._skill_registry = SkillRegistry()
+        self._skill_registry.set_scanner(SkillScanner())
+        self._skill_registry.discover()
+        self._orchestrator.skill_registry = self._skill_registry
 
     # ── Mode ────────────────────────────────────────────────────────────
 
@@ -395,7 +402,7 @@ class OmniAgentAPI:
         parts = cmd.split(maxsplit=1)
         command = parts[0].lower()
         responses = {
-            "/help": "可用命令:\n  /help — 显示帮助\n  /status — 系统状态\n  /clear — 清空对话\n  /models — 已配置模型\n  /agents — 已注册 Agent\n  /tools — 已注册工具\n  /workflows — 可用工作流模板",
+            "/help": "可用命令:\n  /help — 显示帮助\n  /status — 系统状态\n  /clear — 清空对话\n  /models — 已配置模型\n  /agents — 已注册 Agent\n  /tools — 已注册工具\n  /workflows — 可用工作流模板\n  /skills — 已安装技能",
             "/clear": "__CLEAR__",
         }
         if command in responses:
@@ -436,6 +443,18 @@ class OmniAgentAPI:
                 self._emit("system", f"可用工作流 ({len(workflows)}):\n" + "\n".join(lines), "info")
             else:
                 self._emit("system", "无可用工作流模板。", "warning")
+            return json.dumps({"status": "started", "mode": "command"})
+        elif command == "/skills":
+            skills = self._skill_registry.to_list() if hasattr(self, '_skill_registry') else []
+            if skills:
+                lines = []
+                for s in skills:
+                    status = "✅" if s["enabled"] else "❌"
+                    caps = ", ".join(s["capabilities"][:3]) if s["capabilities"] else "none"
+                    lines.append(f"  {status} {s['id']} v{s['version']} — {s['name']} [{caps}]")
+                self._emit("system", f"已安装技能 ({len(skills)}):\n" + "\n".join(lines), "info")
+            else:
+                self._emit("system", "未安装任何技能。使用 install_skill() 安装。", "warning")
             return json.dumps({"status": "started", "mode": "command"})
         else:
             self._emit("system", f"未知命令: {command}。输入 /help 查看可用命令。", "warning")
@@ -851,6 +870,65 @@ class OmniAgentAPI:
             )
             loop.close()
             return json.dumps({"status": "ok", "name": name, "stages": len(stages)})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    # ── Skills ───────────────────────────────────────────────────────────
+
+    def get_skills(self) -> str:
+        """Return all registered skills as JSON."""
+        if not hasattr(self, '_skill_registry'):
+            return "[]"
+        return json.dumps(self._skill_registry.to_list())
+
+    def install_skill(self, git_url: str) -> str:
+        """Install a skill from a git URL."""
+        try:
+            from ..skills.installer import install_skill_from_git
+            manifest = install_skill_from_git(git_url)
+            from ..skills.models import InstalledSkill
+            from ..skills.installer import SKILLS_DIR
+            skill_path = SKILLS_DIR / manifest.id
+            self._skill_registry.register(InstalledSkill(
+                manifest=manifest, path=skill_path,
+            ))
+            return json.dumps({
+                "status": "ok",
+                "id": manifest.id,
+                "name": manifest.name,
+                "version": manifest.version,
+            })
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def uninstall_skill(self, skill_id: str) -> str:
+        """Uninstall a skill."""
+        try:
+            from ..skills.installer import uninstall_skill
+            if uninstall_skill(skill_id):
+                self._skill_registry.unregister(skill_id)
+                return json.dumps({"status": "ok"})
+            return json.dumps({"status": "error", "message": "Skill not found"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def toggle_skill(self, skill_id: str, enabled: bool) -> str:
+        """Enable or disable a skill."""
+        if enabled:
+            ok = self._skill_registry.enable(skill_id)
+        else:
+            ok = self._skill_registry.disable(skill_id)
+        if ok:
+            return json.dumps({"status": "ok"})
+        return json.dumps({"status": "error", "message": "Skill not found"})
+
+    def search_community_skills(self, query: str) -> str:
+        """Search the community skill index."""
+        try:
+            from ..skills.community import SkillCommunityRegistry
+            reg = SkillCommunityRegistry()
+            results = reg.search(query)
+            return json.dumps({"status": "ok", "results": results})
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
