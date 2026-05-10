@@ -90,10 +90,10 @@ async def run_orchestration_demo(app: OmniAgentTUI) -> None:
     await asyncio.sleep(0.6)
 
     analyzer = TaskAnalyzer()
-    analysis = analyzer.analyze(task)
+    analysis = await analyzer.analyze(task)
     event_log.add_event(
         "orchestrator",
-        f"Domain: {analysis['domain']} | Suggested workflow: {analysis['suggested_workflow']}",
+        f"Domain: {analysis.domain} | Stages: {len(analysis.suggested_stages)}",
         "info",
     )
     await asyncio.sleep(0.4)

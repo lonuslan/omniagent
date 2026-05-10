@@ -263,10 +263,16 @@ class ClaudeProvider(LLMProvider):
                 self._handle_response(resp)
                 async for line in resp.aiter_lines():
                     if line.startswith("data: "):
-                        data = line[6:]
-                        if data == "[DONE]":
+                        data_str = line[6:].strip()
+                        if not data_str:
+                            continue
+                        try:
+                            data = json.loads(data_str)
+                        except json.JSONDecodeError:
+                            continue
+                        yield data
+                        if data.get("type") == "message_stop":
                             break
-                        yield json.loads(data)
         except httpx.TimeoutException:
             raise ProviderError("Stream timed out", provider="anthropic")
 

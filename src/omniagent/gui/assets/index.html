@@ -1,135 +1,114 @@
-<!DOCTYPE html><html lang="zh-CN"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>OmniAgent Studio</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-:root{--bg:#1a1b1e;--bg2:#1e1f22;--bg3:#222327;--bg4:#2d2f34;--bg5:#2a2b2e;--bd:#3a3b3e;--bd2:#4a4b50;--tx:#e1e1e3;--tx2:#9b9c9e;--tx3:#6b6c6e;--ac:#7c8aff;--ac2:#5b6aef;--ok:#4ade80;--wn:#f59e0b;--er:#f87171;--font:'Inter','Segoe UI',system-ui,sans-serif;--mono:'JetBrains Mono',Consolas,monospace}
-body{font-family:var(--font);background:var(--bg);color:var(--tx);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:13px}
-#titlebar{background:var(--bg2);border-bottom:1px solid var(--bd);height:36px;display:flex;align-items:center;padding:0 12px;-webkit-app-region:drag;gap:8px}
-#titlebar .tl{font-weight:700;font-size:13px}#titlebar .tl span{color:var(--ac)}#titlebar .spacer{flex:1}
-#titlebar .ver{font-size:10px;color:var(--tx3);background:var(--bg3);padding:2px 8px;border-radius:10px}
-#app{flex:1;display:flex;overflow:hidden}
-#sidebar{width:44px;min-width:44px;background:var(--bg2);border-right:1px solid var(--bd);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px}
-#sidebar .si{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--tx3);cursor:pointer;font-size:15px;transition:.15s;position:relative}
-#sidebar .si:hover{background:var(--bg5);color:var(--tx)}#sidebar .si.active{background:var(--bg3);color:var(--ac)}
-#sidebar .si .tip{display:none;position:absolute;left:40px;top:50%;transform:translateY(-50%);background:var(--bg3);border:1px solid var(--bd);padding:3px 8px;border-radius:5px;font-size:10px;white-space:nowrap;z-index:10}
-#sidebar .si:hover .tip{display:block}#sidebar .ssp{flex:1}
-#main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
-#conv{flex:1;overflow-y:auto;padding:12px 0}
-.ci{max-width:800px;margin:0 auto;padding:0 24px;display:flex;flex-direction:column;gap:12px}
-.welcome{text-align:center;padding:36px 20px 20px}.welcome h1{font-size:20px;font-weight:700;margin-bottom:4px}
-.welcome h1 span{color:var(--ac)}.welcome p{color:var(--tx2);font-size:12px;max-width:420px;margin:0 auto 14px}
-.welcome .qa{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
-.welcome .qa button{background:var(--bg3);border:1px solid var(--bd);color:var(--tx);padding:6px 12px;border-radius:7px;font-size:11px;cursor:pointer;transition:.15s}
-.welcome .qa button:hover{background:var(--bg5)}
-.msg{display:flex;gap:10px;animation:in .2s}.msg-av{width:26px;height:26px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;background:var(--bg3)}
-.msg-bd{max-width:85%}.msg-s{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px;color:var(--tx3)}
-.msg-b{background:var(--bg3);border:1px solid var(--bd);border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.6}
-.pc{background:#1a1b1e;border:1px solid var(--bd);border-radius:8px;padding:3px 0;margin:4px 0}
-.pc .ps{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:11px;color:var(--tx3);transition:all .3s}
-.pc .ps.running{color:var(--tx);background:rgba(124,138,255,.05)}.pc .ps.completed{color:var(--tx2)}
-.pc .ps .pss{width:16px;font-size:12px}.pc .ps .psi{font-size:14px;width:20px;text-align:center}
-.pc .ps .psn{flex:1;font-weight:500}.pc .ps .psa{font-size:10px;color:var(--tx3)}
-#input-bar{border-top:1px solid var(--bd);background:var(--bg2);padding:10px 16px}
-.ir{max-width:800px;margin:0 auto;display:flex;gap:8px;align-items:flex-end}
-.md{position:relative}.md-btn{background:var(--bg3);border:1px solid var(--bd);color:var(--tx2);padding:7px 10px;border-radius:8px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap}
-.md-btn:hover{color:var(--tx);border-color:var(--bd2)}.md-menu{display:none;position:absolute;bottom:100%;left:0;margin-bottom:4px;background:var(--bg3);border:1px solid var(--bd);border-radius:8px;padding:4px;min-width:140px;z-index:20}
-.md.open .md-menu{display:block}.md-item{padding:8px 12px;border-radius:6px;cursor:pointer;font-size:11px;display:flex;align-items:center;gap:8px}
-.md-item:hover{background:var(--bg5)}.md-item .mdd{font-size:9px;color:var(--tx3)}
-.iw{flex:1;display:flex;gap:6px;background:var(--bg4);border:1px solid var(--bd);border-radius:10px;padding:5px 8px;align-items:flex-end;transition:border-color .2s}
-.iw:focus-within{border-color:var(--ac2)}#ui{flex:1;background:none;border:none;color:var(--tx);font-family:var(--font);font-size:13px;resize:none;padding:5px 6px;outline:none;max-height:90px;min-height:20px}
-#ui::placeholder{color:var(--tx3)}#bs{background:var(--ac)!important;color:#fff!important;border:none;border-radius:7px!important;width:30px;height:30px;cursor:pointer;font-size:14px;flex-shrink:0}
-#bs:hover{background:var(--ac2)!important}#bs:disabled{opacity:.4}
-#rp{width:340px;min-width:340px;background:var(--bg2);border-left:1px solid var(--bd);display:flex;flex-direction:column}
-.rt{display:flex;border-bottom:1px solid var(--bd)}.rtb{flex:1;padding:7px 4px;text-align:center;font-size:10px;cursor:pointer;color:var(--tx3);border-bottom:2px solid transparent;transition:.15s}
-.rtb:hover{color:var(--tx)}.rtb.active{color:var(--ac);border-bottom-color:var(--ac)}
-.rc{flex:1;overflow-y:auto;padding:8px}.rp-p{display:none}.rp-p.active{display:block}
-.mtags{display:flex;flex-wrap:wrap;gap:4px;padding:0 0 10px}
-.mtag{padding:5px 10px;border-radius:14px;font-size:10px;cursor:pointer;border:1px solid var(--bd);color:var(--tx2);transition:.15s;white-space:nowrap}
-.mtag:hover{border-color:var(--bd2);color:var(--tx)}.mtag.sel{border-color:var(--ac);color:var(--ac);background:rgba(124,138,255,.1)}
-.mtag.active-tag{border-color:var(--ok);color:var(--ok)}
-.cfg label{display:block;font-size:10px;color:var(--tx3);margin:8px 0 3px;font-weight:600}
-.cfg input,.cfg textarea{width:100%;background:var(--bg4);border:1px solid var(--bd);color:var(--tx);padding:6px 8px;border-radius:5px;font-size:11px;font-family:var(--mono);outline:none}
-.cfg input:focus,.cfg textarea:focus{border-color:var(--ac2)}.cfg textarea{height:55px;resize:vertical;font-size:10px}
-.cfg .row{display:flex;gap:8px}.cfg .row>div{flex:1}
-.cfg .btns{display:flex;gap:6px;margin-top:12px}
-.cfg .btns button{padding:6px 14px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600;transition:.15s;border:1px solid var(--bd)}
-.cfg .btn-save{background:var(--ac);color:#fff;border-color:var(--ac)}.cfg .btn-test{background:var(--bg3);color:var(--tx)}
-.cfg .btn-activate{background:var(--ok);color:#000;border-color:var(--ok)}
-.cfg .result{margin-top:8px;padding:6px 10px;border-radius:5px;font-size:10px;font-family:var(--mono)}
-.cfg .result.ok{background:rgba(74,222,128,.1);color:var(--ok)}.cfg .result.err{background:rgba(248,113,113,.1);color:var(--er)}
-.agent-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;font-size:11px;transition:.15s}
-.agent-row:hover{background:var(--bg5)}.agent-row .ad{width:6px;height:6px;border-radius:50%;background:var(--tx3);flex-shrink:0}
-.agent-row .ad.running{background:var(--ok);box-shadow:0 0 5px rgba(74,222,128,.4)}.agent-row .ai{flex:1;overflow:hidden}
-.agent-row .an{font-weight:500;font-size:11px}.agent-row .ac{font-size:9px;color:var(--tx3)}
-.tool-row{padding:6px 10px;margin-bottom:2px;border-radius:6px;font-size:11px;transition:.15s}
-.tool-row:hover{background:var(--bg5)}.tool-row .tn{font-family:var(--mono);color:var(--ac);font-weight:600;font-size:10px}
-.tool-row .td{font-size:10px;color:var(--tx3);margin-top:2px}
-#statusbar{background:var(--bg2);border-top:1px solid var(--bd);height:24px;display:flex;align-items:center;padding:0 10px;font-size:10px;color:var(--tx3);gap:12px}
-#statusbar .sd{width:5px;height:5px;border-radius:50%;background:var(--ok)}#statusbar .sd.busy{background:var(--wn);animation:pulse 1s infinite}
-#statusbar .ssp{flex:1}@keyframes in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}
-</style></head><body>
-<div id="titlebar"><div class="tl">🎯 <span>OmniAgent</span> Studio</div><div class="spacer"></div><div class="ver">v0.2.0</div></div>
-<div id="app">
-<div id="sidebar"><div class="si active"><span>💬</span><span class="tip">对话</span></div><div class="ssp"></div><div class="si"><span>⚙️</span><span class="tip">设置</span></div></div>
-<div id="main"><div id="conv"><div class="ci" id="ci">
-<div class="welcome" id="wmsg"><h1>🎯 <span>OmniAgent</span> Studio</h1>
-<p>自主多Agent协同平台 — 配置 LLM → 输入任务 → AI 自动调度最优 Agent 协作完成</p>
-<div class="qa">
-<button onclick="s('用React+FastAPI构建一个全栈待办事项应用，包含用户认证和响应式设计')">💻 软件开发</button>
-<button onclick="s('帮我写一份微服务架构的技术设计文档')">📝 文档写作</button>
-</div></div></div></div>
-<div id="input-bar"><div class="ir">
-<div class="md" id="md"><button class="md-btn" onclick="document.getElementById('md').classList.toggle('open')"><span id="mdi">🤖</span> <span id="mdl">Agent</span> ▾</button>
-<div class="md-menu"><div class="md-item" onclick="sm('plan')"><span>🔍</span><span><b>Plan</b><br><span class="mdd">只读探索</span></span></div>
-<div class="md-item" onclick="sm('agent')"><span>🤖</span><span><b>Agent</b><br><span class="mdd">每步确认</span></span></div>
-<div class="md-item" onclick="sm('auto')"><span>⚡</span><span><b>Auto</b><br><span class="mdd">全自动</span></span></div></div></div>
-<div class="iw"><textarea id="ui" placeholder="描述你的任务… (Enter 发送)" rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();s(this.value)}"></textarea><button id="bs" onclick="s(document.getElementById('ui').value)">↑</button></div>
-</div></div></div>
-<div id="rp"><div class="rt"><div class="rtb active" onclick="st('agents')">🤖 Agents</div><div class="rtb" onclick="st('models')">🔑 模型</div><div class="rtb" onclick="st('tools')">🔧 工具</div><div class="rtb" onclick="st('audit')">📋 审计</div></div>
-<div class="rc">
-<div class="rp-p active" id="rp-agents"><div id="alist"></div></div>
-<div class="rp-p" id="rp-models"><div class="mtags" id="mtags"></div><div id="mcfg"><span style="font-size:11px;color:var(--tx3)">↑ 点击上方标签选择模型进行配置</span></div></div>
-<div class="rp-p" id="rp-tools"><div id="tlist"></div></div>
-<div class="rp-p" id="rp-audit"><div id="al"><span style="font-size:11px;color:var(--tx3)">运行后显示审计记录</span></div></div>
-</div></div></div>
-<div id="statusbar"><div class="sd" id="sd"></div><span id="ss">就绪</span><span class="ssp"></span><span id="sl">🔌 LLM 未配置</span><span class="ssp"></span><span id="sp"></span><span class="ssp"></span><span>5 Agents</span></div>
-<script>
-var pt=null,running=false,cm="agent",activeModel="",allModels=[];
-function sm(m){cm=m;document.getElementById("md").classList.remove("open");
-document.getElementById("mdi").textContent={plan:"🔍",agent:"🤖",auto:"⚡"}[m];
-document.getElementById("mdl").textContent={plan:"Plan",agent:"Agent",auto:"Auto"}[m];
-try{pywebview.api.set_mode(m)}catch(e){}}
-function st(tab){document.querySelectorAll(".rtb").forEach(function(b,i){b.classList.toggle("active",["agents","models","tools","audit"][i]===tab)});
-document.querySelectorAll(".rp-p").forEach(function(p){p.classList.remove("active")});
-document.getElementById("rp-"+tab).classList.add("active")}
-async function lm(){try{var d=JSON.parse(await pywebview.api.get_models());allModels=d.models;activeModel=d.active_model;rm()}catch(e){document.getElementById("mtags").innerHTML='<span style="color:var(--er);font-size:11px">加载失败: '+e.message+'</span>'}}
-function rm(){document.getElementById("mtags").innerHTML=allModels.map(function(m){return '<span class="mtag'+(m.active?" active-tag":"")+(activeModel===m.id?" sel":"")+'" onclick="smd(\''+m.id+'\')" id="mtag-'+m.id+'">'+m.name+(activeModel===m.id?" ⚡":"")+'</span>'}).join("")}
-async function smd(id){try{var d=JSON.parse(await pywebview.api.get_model_defaults(id));
-document.getElementById("mcfg").innerHTML='<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="font-size:13px">'+d.name+'</b><span style="font-size:10px;color:var(--ac)">'+d.provider+'</span><span style="font-size:10px;color:var(--tx3)">| '+d.api_format+' | '+d.context+'</span><a href="'+d.doc_url+'" style="font-size:10px;color:var(--ac);margin-left:auto" target="_blank">📖 文档</a></div><label>🔑 API Key</label><input type="password" id="fkey" value="'+d.api_key+'" placeholder="sk-..."><label>🔗 Base URL</label><input type="text" id="furl" value="'+(d.base_url_override||d.base_url)+'" placeholder="'+d.base_url+'"><div class="row"><div><label>📐 Max Tokens</label><input type="number" id="fmt" value="'+d.max_tokens+'"></div><div><label>🌡️ Temperature</label><input type="number" id="ftemp" value="'+d.temperature+'" step="0.1" min="0" max="2"></div></div><label>📝 额外配置 (auth: '+d.auth_format+', format: '+d.api_format+')</label><textarea id="fyaml" placeholder="# Extra config">'+(d.extra_headers||"")+'</textarea><div class="btns"><button class="btn-save" onclick="sv(\''+d.id+'\')">💾 保存</button><button class="btn-test" onclick="test(\''+d.id+'\')">🔌 测试</button>'+(activeModel===d.id?'<button class="btn-activate">⚡ 已激活</button>':'<button class="btn-activate" onclick="act(\''+d.id+'\')">✅ 激活</button>')+'</div><div id="res-'+d.id+'"></div>';
-document.getElementById("mtags").querySelectorAll(".mtag").forEach(function(t){t.classList.remove("sel")});
-document.getElementById("mtag-"+id).classList.add("sel")}catch(e){document.getElementById("mcfg").innerHTML='<div style="color:var(--er);font-size:11px">'+e.message+'</div>'}}
-async function sv(id){var cfg={api_key:document.getElementById("fkey").value.trim(),base_url:document.getElementById("furl").value.trim(),max_tokens:parseInt(document.getElementById("fmt").value)||4096,temperature:parseFloat(document.getElementById("ftemp").value)||0.7};if(!cfg.api_key){sr(id,"请输入 API Key","err");return}
-try{await pywebview.api.save_model_config(id,JSON.stringify(cfg));sr(id,"已保存","ok");lm()}catch(e){sr(id,"保存失败","err")}}
-async function test(id){sr(id,"测试中…","");try{var r=JSON.parse(await pywebview.api.test_model_connection(id));sr(id,(r.latency_ms?"["+r.latency_ms+"ms] ":"")+r.message,r.status)}catch(e){sr(id,"测试失败: "+e.message,"err")}}
-async function act(id){try{var r=JSON.parse(await pywebview.api.select_model(id));if(r.status==="ok"){sr(id,"模型已激活","ok");activeModel=id;lm();rl()}}catch(e){sr(id,"激活失败","err")}}
-function sr(id,msg,cls){document.getElementById("res-"+id).innerHTML='<div class="result '+cls+'">'+msg+'</div>'}
-async function la(){try{var a=JSON.parse(await pywebview.api.get_agents());document.getElementById("alist").innerHTML=a.map(function(a){return '<div class="agent-row" id="ar-'+a.id+'"><div class="ad" id="ard-'+a.id+'"></div><div class="ai"><div class="an">'+a.name+'</div><div class="ac">'+(a.capabilities||[]).slice(0,2).join(", ")+'</div></div></div>'}).join("")}catch(e){}}
-async function lt(){try{var t=JSON.parse(await pywebview.api.get_tools());var cats={file:"📁",shell:"💻",web:"🌐"};document.getElementById("tlist").innerHTML=t.map(function(t){return '<div class="tool-row"><span class="tn">'+t.name+'</span> <span style="font-size:9px;color:var(--tx3)">'+cats[t.category]+(t.requires_approval?" 🔒":"")+'</span><div class="td">'+t.description+'</div></div>'}).join("")}catch(e){}}
-async function rl(){try{var s=JSON.parse(await pywebview.api.get_llm_status());document.getElementById("sl").textContent=s.active_model?"🔌 LLM: "+s.active_model:"🔌 LLM 未配置"}catch(e){}}
-async function s(t){if(!t||!t.trim()||running)return;document.getElementById("ui").value="";document.getElementById("ui").style.height="auto";var w=document.getElementById("wmsg");if(w)w.remove();am("👤","YOU",t.trim());us("分析中…",true);document.getElementById("bs").disabled=true;
-try{var r=JSON.parse(await pywebview.api.execute_task(t.trim()));if(r.status==="started"){am("🎯","ORCHESTRATOR","任务已接收"+(r.mode==="llm"?" (LLM 模式)":" (Demo 模式)"));sp()}}catch(e){am("🎯","ORCHESTRATOR","错误: "+e.message);us("就绪",false);document.getElementById("bs").disabled=false}}
-function am(av,sn,tx){var e=document.getElementById("ci");var d=document.createElement("div");d.className="msg";d.innerHTML='<div class="msg-av">'+av+'</div><div class="msg-bd"><div class="msg-s">'+sn+'</div><div class="msg-b">'+et(tx)+'</div></div>';e.appendChild(d);document.getElementById("conv").scrollTop=document.getElementById("conv").scrollHeight}
-function apc(ss){var e=document.getElementById("ci");var d=document.createElement("div");d.className="msg";d.innerHTML='<div class="msg-av">🔄</div><div class="msg-bd" style="flex:1;max-width:100%"><div class="msg-s">PIPELINE</div><div class="msg-b" style="padding:0"><div class="pc">'+ss.map(function(s,i){return '<div class="ps" id="ps-'+i+'"><span class="pss">⬜</span><span class="psi">'+(s.emoji||"▶️")+'</span><span class="psn">'+s.name+'</span><span class="psa" id="psa-'+i+'"></span></div>'}).join("")+'</div></div></div>';e.appendChild(d);document.getElementById("conv").scrollTop=document.getElementById("conv").scrollHeight}
-function sp(){if(pt)clearInterval(pt);var ca=false;pt=setInterval(async function(){try{var ev=JSON.parse(await pywebview.api.poll_events());ev.forEach(function(e){if(e.type==="event")am("🎯",e.source.toUpperCase(),e.message);else if(e.type==="action"){if(e.action==="init_pipeline"&&!ca){ca=true;apc(e.stages||[{name:"需求确认",emoji:"📋"},{name:"需求分析",emoji:"🔬"},{name:"原型设计",emoji:"🎨"},{name:"前端开发",emoji:"💻"},{name:"后端开发",emoji:"⚙️"},{name:"测试",emoji:"🧪"},{name:"部署上线",emoji:"🚀"}])}else if(e.action==="stage_update"){usv(e.index,e.status,e.agent);ud(e.agent,e.status)}else if(e.action==="demo_complete"){stp("完成")}}})}catch(e){}},200)}
-function stp(msg){if(pt){clearInterval(pt);pt=null}us(msg||"完成",false);document.getElementById("bs").disabled=false;running=false;document.querySelectorAll(".ad.running").forEach(function(d){d.classList.remove("running")})}
-function usv(i,s,a){var el=document.getElementById("ps-"+i);if(!el)return;el.className="ps "+s;el.querySelector(".pss").textContent={pending:"⬜",running:"⚡",completed:"✅",failed:"❌"}[s]||"⬜";var ae=document.getElementById("psa-"+i);if(ae&&a)ae.textContent="→ "+a.replace("Agent","").replace("-"," ").trim();document.getElementById("sp").textContent=document.querySelectorAll(".ps.completed").length?"Stage "+(parseInt(document.querySelectorAll(".ps.completed").length)+1)+"/"+document.querySelectorAll(".ps").length:""}
-function ud(id,s){var d=document.getElementById("ard-"+id);if(d)d.className="ad"+(s==="running"?" running":"")}
-function us(t,b){document.getElementById("ss").textContent=t;document.getElementById("sd").className=b?"sd busy":"sd"}
-function et(t){var d=document.createElement("div");d.textContent=t;return d.innerHTML}
-document.getElementById("ui").addEventListener("input",function(){this.style.height="auto";this.style.height=Math.min(this.scrollHeight,90)+"px"})
-document.addEventListener("click",function(e){if(!e.target.closest(".md"))document.getElementById("md").classList.remove("open")})
-setTimeout(function(){lm();la();lt();rl();us("就绪",false)},300);
-</script></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmniAgent Studio</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Titlebar -->
+    <div id="titlebar">
+        <div class="title"><span class="accent">OmniAgent</span> Studio</div>
+        <div class="spacer"></div>
+        <div class="version">v0.2.0</div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app">
+        <!-- Sidebar -->
+        <div id="sidebar">
+            <div class="sidebar-item active" data-panel="chat" title="Chat">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            </div>
+            <div class="sidebar-spacer"></div>
+            <div class="sidebar-item" data-panel="settings" title="Settings" id="settings-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </div>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div id="main">
+            <div id="chat-area">
+                <div id="messages">
+                    <!-- Welcome screen -->
+                    <div id="welcome" class="welcome">
+                        <h1><span class="accent">OmniAgent</span> Studio</h1>
+                        <p>自主多Agent协同平台 — 配置 LLM &rarr; 输入任务 &rarr; AI 自动调度最优 Agent 协作完成</p>
+                        <div class="quick-actions">
+                            <button onclick="submitTask('用React+FastAPI构建一个全栈待办事项应用，包含用户认证和响应式设计')">软件开发</button>
+                            <button onclick="submitTask('帮我写一份微服务架构的技术设计文档')">文档写作</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Bar -->
+            <div id="input-bar">
+                <div class="input-row">
+                    <div class="mode-selector" id="mode-selector">
+                        <button class="mode-btn" data-mode="plan" title="Plan: 只读探索">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+                            Plan
+                        </button>
+                        <button class="mode-btn active" data-mode="agent" title="Agent: 每步确认">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8V4H8"></path><rect width="16" height="12" x="4" y="8" rx="2"></rect><path d="M2 14h2"></path><path d="M20 14h2"></path><path d="M15 13v2"></path><path d="M9 13v2"></path></svg>
+                            Agent
+                        </button>
+                        <button class="mode-btn" data-mode="auto" title="Auto: 全自动">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                            Auto
+                        </button>
+                    </div>
+                    <div class="input-wrapper">
+                        <textarea id="user-input" placeholder="Describe your task..." rows="1"></textarea>
+                        <button id="send-btn" title="Send (Enter)">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="modal-close" id="settings-close">&times;</button>
+            </div>
+            <div class="modal-tabs">
+                <button class="modal-tab active" data-tab="models">Models</button>
+                <button class="modal-tab" data-tab="agents">Agents</button>
+                <button class="modal-tab" data-tab="tools">Tools</button>
+            </div>
+            <div class="modal-body">
+                <div class="tab-panel active" id="tab-models">
+                    <div class="model-tags" id="model-tags"></div>
+                    <div id="model-config"></div>
+                </div>
+                <div class="tab-panel" id="tab-agents">
+                    <div id="agent-list"></div>
+                </div>
+                <div class="tab-panel" id="tab-tools">
+                    <div id="tool-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div id="statusbar">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Ready</span>
+        <span class="spacer"></span>
+        <span id="model-status">No LLM configured</span>
+        <span class="spacer"></span>
+        <span id="agent-count"></span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

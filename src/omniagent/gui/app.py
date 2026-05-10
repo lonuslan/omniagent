@@ -130,6 +130,7 @@ class OmniAgentAPI:
     def __init__(self) -> None:
         self._registry: AgentRegistry | None = None
         self._orchestrator: Orchestrator | None = None
+        self._lock = threading.Lock()
         self._running = False
         self._events: queue.Queue = queue.Queue()
         self._mode: ExecutionMode = ExecutionMode.AGENT
@@ -228,6 +229,11 @@ class OmniAgentAPI:
             return json.dumps({"status": "error", "message": "请先配置 API Key"})
         self._active_model_id = model_id
         self._llm_bridge.configure(model_id, cfg["api_key"], cfg.get("base_url", ""))
+        # Wire LLM provider into orchestrator's analyzer
+        provider = self._llm_bridge.get_provider()
+        if provider and self._orchestrator:
+            from ..core.analyzer import TaskAnalyzer
+            self._orchestrator.analyzer = TaskAnalyzer(llm_provider=provider)
         return json.dumps({"status": "ok", "active_model": model_id})
 
     def test_model_connection(self, model_id: str) -> str:
@@ -255,11 +261,10 @@ class OmniAgentAPI:
                 body = {"model": model_id, "max_tokens": 10, "messages": [{"role": "user", "content": "hi"}]}
                 test_url = f"{base_url}/chat/completions"
 
-            client = httpx.Client(timeout=20)
-            start = time.time()
-            resp = client.post(test_url, json=body, headers=headers)
-            elapsed_ms = round((time.time() - start) * 1000)
-            client.close()
+            with httpx.Client(timeout=20) as client:
+                start = time.time()
+                resp = client.post(test_url, json=body, headers=headers)
+                elapsed_ms = round((time.time() - start) * 1000)
 
             if resp.status_code in (200, 201):
                 data = resp.json()
@@ -311,10 +316,11 @@ class OmniAgentAPI:
 
     def execute_task(self, task_text: str) -> str:
         """Execute a task using real LLM if configured, fallback to demo."""
-        if self._running:
-            return json.dumps({"status": "error", "message": "Already running"})
-        self._running = True
-        self._events = queue.Queue()
+        with self._lock:
+            if self._running:
+                return json.dumps({"status": "error", "message": "Already running"})
+            self._running = True
+            self._events = queue.Queue()
 
         provider = self._llm_bridge.get_provider()
         if provider and self._active_model_id:
@@ -400,7 +406,8 @@ Response language: Chinese if the task is in Chinese, otherwise English."""
         except Exception as e:
             self._emit("system", f"执行错误: {e}", "error")
         finally:
-            self._running = False
+            with self._lock:
+                self._running = False
             self._action("demo_complete")
 
     # ── Demo ────────────────────────────────────────────────────────────
@@ -447,16 +454,39 @@ Response language: Chinese if the task is in Chinese, otherwise English."""
             } for r in self._tool_executor.get_audit_log()[-50:]])
         return "[]"
 
+    def get_conversations(self) -> str:
+        """Return conversation history list. Placeholder for future persistence."""
+        return json.dumps([])
+
+    def get_system_info(self) -> str:
+        """Return system status information for the status bar."""
+        return json.dumps({
+            "running": self._running,
+            "mode": self._mode.value,
+            "active_model": self._active_model_id,
+            "agents": len(self._registry.list_all()) if self._registry else 0,
+            "tools": len(self._tool_registry.list_descriptors()) if hasattr(self, '_tool_registry') else 0,
+        })
+
     def _emit(self, source, message, level="info"):
         self._events.put({"type": "event", "source": source, "message": message, "level": level})
 
     def _action(self, action, **kw):
         self._events.put({"type": "action", "action": action, **kw})
 
+    def _emit_tool_call(self, tool_name: str, args: dict, result: str, is_error: bool = False):
+        self._events.put({
+            "type": "tool_call", "tool": tool_name,
+            "args": args, "result": str(result)[:500], "error": is_error,
+        })
+
     def _demo_thread(self):
         try: self._run_demo()
         except Exception as e: self._emit("system", f"Error: {e}", "error")
-        finally: self._running = False; self._action("demo_complete")
+        finally:
+            with self._lock:
+                self._running = False
+            self._action("demo_complete")
 
     def _run_demo(self):
         self._emit("system", "⚠️ 未配置 LLM，使用 Demo 模式", "warning")
@@ -491,8 +521,13 @@ def launch_gui() -> None:
     assets = get_assets_dir()
     html_path = assets / "index.html"
     if not html_path.exists(): raise FileNotFoundError(str(html_path))
+    api = OmniAgentAPI()
     webview.create_window(
-        title="OmniAgent Studio", html=html_path.read_text(encoding="utf-8"),
-        js_api=OmniAgentAPI(), width=1280, height=860, min_size=(960, 600), resizable=True,
+        title="OmniAgent Studio",
+        url=str(html_path),
+        js_api=api,
+        width=1280, height=860,
+        min_size=(960, 600),
+        resizable=True,
     )
     webview.start(debug=False, http_server=True)

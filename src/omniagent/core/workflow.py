@@ -211,11 +211,11 @@ class WorkflowRegistry:
     """Registry for workflow templates, extensible with custom workflows."""
 
     _instance: WorkflowRegistry | None = None
-    _workflows: dict[str, IWorkflowTemplate] = {}
 
     def __new__(cls) -> WorkflowRegistry:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            cls._instance._workflows = {}
             cls._instance._register_builtins()
         return cls._instance
 

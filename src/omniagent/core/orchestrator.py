@@ -54,11 +54,12 @@ class Orchestrator:
         registry: AgentRegistry,
         runtime_pool: AgentRuntimePool | None = None,
         config: OrchestratorConfig | None = None,
+        llm_provider: Any | None = None,
     ) -> None:
         self.registry = registry
         self.runtime = runtime_pool
         self.config = config or OrchestratorConfig()
-        self.analyzer = TaskAnalyzer()
+        self.analyzer = TaskAnalyzer(llm_provider=llm_provider)
         self.stream = EventStream()
         self._active_tasks: dict[str, Task] = {}
         self._stage_outputs: dict[str, list[dict[str, Any]]] = {}
@@ -321,11 +322,15 @@ class Orchestrator:
 
     def _instantiate_agent(self, descriptor: Any) -> Any:
         """Try to instantiate an agent from its descriptor. Returns None if not possible."""
-        try:
-            from ..agents.base import AgentFactory
-            return AgentFactory.create(descriptor)
-        except Exception:
-            return None
+        entry = self.registry._agents.get(descriptor.id)
+        if entry and entry[1]:
+            try:
+                agent = entry[1]()
+                agent.descriptor = descriptor
+                return agent
+            except Exception:
+                return None
+        return None
 
     # ── Collaboration ────────────────────────────────────────────────────
 

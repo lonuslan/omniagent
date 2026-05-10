@@ -57,6 +57,7 @@ class WriteTool(BaseTool):
             ToolParam(name="content", description="Content to write", required=True),
         ],
         category="file",
+        requires_approval=True,
     )
 
     async def execute(self, file_path: str, content: str) -> str:
@@ -79,6 +80,7 @@ class EditTool(BaseTool):
             ToolParam(name="new_string", description="Replacement text", required=True),
         ],
         category="file",
+        requires_approval=True,
     )
 
     async def execute(self, file_path: str, old_string: str, new_string: str) -> str:
