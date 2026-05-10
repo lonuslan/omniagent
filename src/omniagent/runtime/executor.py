@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import asyncio
 import time
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
 
 from ..llm.types import ToolCall, ToolResult
 from ..tools.base import BaseTool, ToolRegistry
+from .filelock import FileLockManager
 from .security import (
     ExecutionMode,
     PermissionHandler,
@@ -57,20 +59,28 @@ class ToolExecutor:
         result = await executor.execute(tool_call, context)
     """
 
+    # Tools that modify files (need write lock)
+    _WRITE_TOOLS = frozenset({"write", "edit", "git_commit", "git_checkout"})
+    # Tools that read files (need read lock)
+    _READ_TOOLS = frozenset({"read", "glob", "grep"})
+
     def __init__(
         self,
         registry: ToolRegistry,
         permission_handler: PermissionHandler | None = None,
+        file_lock_manager: FileLockManager | None = None,
     ) -> None:
         self._registry = registry
         self._permissions = permission_handler or PermissionHandler()
         self._audit_log: list[ExecutionRecord] = []
+        self._audit_lock = asyncio.Lock()
         self._pending_approvals: dict[str, PermissionRequest] = {}
+        self._file_locks = file_lock_manager or FileLockManager()
 
     # ── Execution ───────────────────────────────────────────────────────
 
     async def execute(self, tool_call: ToolCall, ctx: ExecutionContext) -> ToolResult:
-        """Execute a tool call with full permission/sandbox checking."""
+        """Execute a tool call with full permission/sandbox checking and file locking."""
         start = time.time()
 
         # 1. Permission check
@@ -113,23 +123,32 @@ class ToolExecutor:
                     is_error=True,
                 )
 
-        # 5. Execute with timeout
-        try:
-            result = await asyncio.wait_for(
-                tool.execute(**tool_call.arguments),
-                timeout=ctx.workspace_policy.max_shell_timeout_sec,
-            )
-        except asyncio.TimeoutError:
-            result = f"Tool execution timed out"
-            is_error = True
-        except Exception as e:
-            result = f"Tool execution error: {e}"
-            is_error = True
-        else:
-            is_error = isinstance(result, str) and result.startswith("Error")
+        # 5. Acquire file lock for file tools
+        file_path = self._extract_file_path(tool_call)
+        lock_ctx = self._acquire_file_lock(tool_call.name, file_path, ctx.agent_id)
 
-        # 6. Audit
-        self._audit_log.append(ExecutionRecord(
+        try:
+            async with lock_ctx:
+                # 6. Execute with timeout
+                try:
+                    result = await asyncio.wait_for(
+                        tool.execute(**tool_call.arguments),
+                        timeout=ctx.workspace_policy.max_shell_timeout_sec,
+                    )
+                except asyncio.TimeoutError:
+                    result = "Tool execution timed out"
+                    is_error = True
+                except Exception as e:
+                    result = f"Tool execution error: {e}"
+                    is_error = True
+                else:
+                    is_error = isinstance(result, str) and result.startswith("Error")
+        except TimeoutError as e:
+            result = str(e)
+            is_error = True
+
+        # 7. Audit (thread-safe)
+        record = ExecutionRecord(
             tool_name=tool_call.name,
             agent_id=ctx.agent_id,
             task_id=ctx.task_id,
@@ -137,7 +156,9 @@ class ToolExecutor:
             result=str(result)[:1000],
             is_error=is_error,
             duration_ms=(time.time() - start) * 1000,
-        ))
+        )
+        async with self._audit_lock:
+            self._audit_log.append(record)
 
         return ToolResult(
             tool_call_id=tool_call.id,
@@ -181,6 +202,24 @@ class ToolExecutor:
         if not path:
             return True  # No path to check
         return policy.is_path_allowed(path)
+
+    def _extract_file_path(self, tool_call: ToolCall) -> str:
+        """Extract the file path from tool arguments."""
+        return tool_call.arguments.get("file_path") or tool_call.arguments.get("path") or ""
+
+    @asynccontextmanager
+    async def _acquire_file_lock(self, tool_name: str, file_path: str, agent_id: str):
+        """Acquire the appropriate file lock (read or write) based on tool type."""
+        if not file_path or tool_name not in (self._WRITE_TOOLS | self._READ_TOOLS):
+            yield  # No lock needed
+            return
+
+        if tool_name in self._WRITE_TOOLS:
+            async with self._file_locks.write_lock(file_path, agent_id):
+                yield
+        else:
+            async with self._file_locks.read_lock(file_path, agent_id):
+                yield
 
     # ── Audit ───────────────────────────────────────────────────────────
 

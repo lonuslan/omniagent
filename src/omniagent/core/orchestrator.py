@@ -16,14 +16,17 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from ..protocol import AgentCapability, AgentEvent, CollaborationMessage, SubTask, Task, TaskStatus
 from ..runtime.sandbox import AgentRuntimePool
 from ..runtime.stream import EventStream, progress_event
 from .analyzer import TaskAnalysis, TaskAnalyzer
+from .negotiation import DebateProposal, NegotiationProtocol, NegotiationResult
 from .registry import AgentRegistry
+from .scorer import AgentScorer, ScoreBreakdown
+from .workflow import WorkflowRegistry
 
 
 @dataclass
@@ -55,14 +58,20 @@ class Orchestrator:
         runtime_pool: AgentRuntimePool | None = None,
         config: OrchestratorConfig | None = None,
         llm_provider: Any | None = None,
+        llm_bridge: Any | None = None,
     ) -> None:
         self.registry = registry
         self.runtime = runtime_pool
         self.config = config or OrchestratorConfig()
         self.analyzer = TaskAnalyzer(llm_provider=llm_provider)
+        self.workflow_registry = WorkflowRegistry()
+        self.scorer = AgentScorer(llm_bridge=llm_bridge)
+        self.negotiator = NegotiationProtocol(llm_bridge=llm_bridge)
         self.stream = EventStream()
         self._active_tasks: dict[str, Task] = {}
         self._stage_outputs: dict[str, list[dict[str, Any]]] = {}
+        self._score_breakdowns: dict[str, list[ScoreBreakdown]] = {}
+        self._negotiation_results: dict[str, list[NegotiationResult]] = {}
 
     # ── Public API ───────────────────────────────────────────────────────
 
@@ -188,11 +197,26 @@ class Orchestrator:
 
     # ── Internal: Decomposition ──────────────────────────────────────────
 
+    # Domain → workflow template name mapping
+    _DOMAIN_WORKFLOW_MAP: dict[str, str] = {
+        "software": "software_lifecycle",
+        "video": "video_production",
+        "document": "document_writing",
+    }
+
     def _generate_sub_tasks(self, task: Task, analysis: TaskAnalysis) -> list[SubTask]:
-        """Generate sub-tasks from the analysis result."""
+        """Generate sub-tasks from analysis result, falling back to workflow templates."""
         stages = analysis.suggested_stages
+
+        # If analyzer produced no stages, try workflow registry by domain
         if not stages:
-            # Fallback: single stage with all capabilities
+            wf_name = self._DOMAIN_WORKFLOW_MAP.get(analysis.domain)
+            if wf_name:
+                template = self.workflow_registry.get(wf_name)
+                if template:
+                    return template.generate_sub_tasks(task)
+
+            # No matching workflow either — single stage fallback
             return [SubTask(
                 id=str(uuid.uuid4()),
                 parent_task_id=task.id,
@@ -242,16 +266,73 @@ class Orchestrator:
     # ── Internal: Agent Assignment ───────────────────────────────────────
 
     async def _assign_agents(self, sub_tasks: list[SubTask]) -> None:
-        """Assign the best agent to each sub-task."""
+        """Assign the best agent to each sub-task using composite scoring."""
+        task_id = sub_tasks[0].parent_task_id if sub_tasks else ""
+        task_desc = ""
+        if task_id in self._active_tasks:
+            task_desc = self._active_tasks[task_id].description
+
+        all_breakdowns: list[ScoreBreakdown] = []
+
         for st in sub_tasks:
             candidates = self.registry.find_by_capability(st.required_capabilities)
             if candidates:
-                # Select best match (already sorted by score)
-                st.assigned_agent = candidates[0][0].id
+                agent_descs = [desc for desc, _ in candidates]
+                # Use composite scorer (LLM + capability + reputation)
+                breakdowns = self.scorer.rank_agents(
+                    task_desc, agent_descs, st.required_capabilities,
+                    use_llm=bool(self.scorer._llm_bridge and self.scorer._llm_bridge.is_configured()),
+                )
+                best = breakdowns[0]
+
+                # Negotiation: trigger when top 2 are close (within 10%)
+                if len(breakdowns) >= 2:
+                    gap = breakdowns[0].composite_score - breakdowns[1].composite_score
+                    if gap < 0.10 and self.negotiator._llm_bridge and self.negotiator._llm_bridge.is_configured():
+                        await self.stream.publish(progress_event(
+                            "orchestrator", st.parent_task_id,
+                            f"Negotiation: '{st.title}' — {breakdowns[0].agent_name} vs {breakdowns[1].agent_name} (gap: {gap:.2f})"
+                        ))
+                        proposals = [
+                            DebateProposal(
+                                agent_id=bd.agent_id, agent_name=bd.agent_name,
+                                position=f"Agent {bd.agent_name} should handle '{st.title}'",
+                                reasoning=f"Composite score: {bd.composite_score:.2f}. {bd.llm_reasoning}",
+                            ) for bd in breakdowns[:2]
+                        ]
+                        neg_result = self.negotiator.negotiate(
+                            topic=f"Best agent for stage: {st.title}",
+                            proposals=proposals,
+                            context=task_desc[:500],
+                        )
+                        if task_id not in self._negotiation_results:
+                            self._negotiation_results[task_id] = []
+                        self._negotiation_results[task_id].append(neg_result)
+
+                        # Winner from negotiation
+                        winner_id = neg_result.arbitration.winner_id
+                        winner_name = neg_result.arbitration.winner_name
+                        st.assigned_agent = winner_id
+                        await self.stream.publish(progress_event(
+                            "orchestrator", st.parent_task_id,
+                            f"Negotiation result: '{st.title}' → {winner_name} "
+                            f"(confidence: {neg_result.arbitration.confidence:.0%}) "
+                            f"— {neg_result.arbitration.reasoning[:100]}"
+                        ))
+                    else:
+                        st.assigned_agent = best.agent_id
+                else:
+                    st.assigned_agent = best.agent_id
+
+                all_breakdowns.extend(breakdowns)
+
                 await self.stream.publish(progress_event(
                     "orchestrator", st.parent_task_id,
-                    f"Assigned '{st.title}' → {candidates[0][0].name} "
-                    f"(score: {candidates[0][1]:.2f})"
+                    f"Assigned '{st.title}' → {best.agent_name} "
+                    f"(composite: {best.composite_score:.2f} | "
+                    f"cap: {best.capability_score:.2f} | "
+                    f"llm: {best.llm_score:.2f} | "
+                    f"rep: {best.reputation_score:.2f})"
                 ))
             elif self.config.fallback_to_general_agent:
                 st.assigned_agent = "general-agent"
@@ -262,15 +343,24 @@ class Orchestrator:
             else:
                 st.assigned_agent = None
 
+        self._score_breakdowns[task_id] = all_breakdowns
+
     # ── Internal: Stage Execution ────────────────────────────────────────
 
     async def _execute_stage(self, sub_task: SubTask, task: Task) -> list[AgentEvent]:
         """Execute a single stage with the assigned agent via the runtime pool."""
 
-        # Inject previous stage outputs into context
+        # Inject summarized previous stage outputs into context
         previous_outputs = self._stage_outputs.get(task.id, [])
         if previous_outputs:
-            sub_task.context["previous_outputs"] = previous_outputs[-3:]  # Last 3
+            # Use LLM summaries if available, fall back to raw metadata
+            summaries = []
+            for output in previous_outputs[-3:]:
+                if "summary" in output:
+                    summaries.append(f"[{output['stage']}] {output['summary']}")
+                else:
+                    summaries.append(f"[{output['stage']}] by {output['agent']} — {output['status']}")
+            sub_task.context["previous_outputs"] = summaries
 
         if not sub_task.assigned_agent:
             return [AgentEvent(
@@ -299,6 +389,8 @@ class Orchestrator:
             if agent:
                 async with self.runtime.session(agent, task.id) as runtime:
                     events = await runtime.execute(sub_task)
+                    # Record success in scorer
+                    self.scorer.record_success(descriptor.id)
                     # Store output for next stages
                     self._stage_outputs[task.id].append({
                         "stage": sub_task.title,
@@ -309,6 +401,7 @@ class Orchestrator:
 
         # Simulation fallback (for demos)
         await asyncio.sleep(0.5)
+        self.scorer.record_success(descriptor.id)
         self._stage_outputs[task.id].append({
             "stage": sub_task.title,
             "agent": descriptor.name,
@@ -332,9 +425,94 @@ class Orchestrator:
                 return None
         return None
 
+    # ── Context Summarization ───────────────────────────────────────────
+
+    def summarize_output(self, stage_name: str, agent_name: str, full_output: str) -> str:
+        """
+        Use LLM to summarize a stage's output for passing to the next stage.
+        Extracts: key decisions, tech choices, file paths, important constraints.
+        Falls back to truncation if no LLM is available.
+        """
+        if not self.scorer._llm_bridge or not self.scorer._llm_bridge.is_configured():
+            return full_output[:300]
+
+        prompt = f"""Summarize this work output in 2-3 sentences. Focus on:
+- Key decisions made
+- Technologies/libraries chosen
+- Files created or modified
+- Important constraints or assumptions
+
+Stage: {stage_name} (by {agent_name})
+Output: {full_output[:1500]}
+
+Reply with ONLY the summary, no preamble."""
+
+        try:
+            result = self.scorer._llm_bridge.complete_sync(
+                model=self.scorer._llm_bridge._active_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=200,
+                temperature=0.2,
+            )
+            content = result.get("content", "") if isinstance(result, dict) else str(result)
+            if result.get("error"):
+                return full_output[:300]
+            return content.strip() or full_output[:300]
+        except Exception:
+            return full_output[:300]
+
+    # ── Workflow Management ──────────────────────────────────────────────
+
+    def list_workflows(self) -> list[dict[str, Any]]:
+        """List all available workflow templates with their stages."""
+        result = []
+        for name in self.workflow_registry.list_all():
+            template = self.workflow_registry.get(name)
+            if template:
+                result.append({
+                    "name": name,
+                    "description": template.description,
+                    "stages": [
+                        {"name": s.name, "description": s.description,
+                         "capabilities": [c.value for c in s.required_capabilities]}
+                        for s in template.stages
+                    ],
+                })
+        return result
+
+    async def register_custom_workflow(self, name: str, description: str, stages: list[dict[str, Any]]) -> None:
+        """Register a user-defined workflow template."""
+        from .workflow import IWorkflowTemplate, WorkflowStage
+
+        class CustomWorkflow(IWorkflowTemplate):
+            pass
+
+        wf = CustomWorkflow()
+        wf.name = name
+        wf.description = description
+        wf.stages = []
+        for s in stages:
+            caps = []
+            for c in s.get("capabilities", []):
+                try:
+                    caps.append(AgentCapability(c))
+                except ValueError:
+                    pass
+            if not caps:
+                caps = [AgentCapability.GENERAL_PURPOSE]
+            wf.stages.append(WorkflowStage(
+                name=s["name"],
+                description=s.get("description", ""),
+                required_capabilities=caps,
+            ))
+        self.workflow_registry.register(wf)
+        await self.stream.publish(progress_event(
+            "orchestrator", "",
+            f"Custom workflow '{name}' registered with {len(wf.stages)} stages"
+        ))
+
     # ── Collaboration ────────────────────────────────────────────────────
 
     async def route_message(self, message: CollaborationMessage) -> None:
         """Route inter-agent message through the collaboration bus."""
-        # Forward to the target agent's runtime if active
         pass

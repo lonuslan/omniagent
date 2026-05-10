@@ -1,35 +1,35 @@
 /* ═══════════════════════════════════════════════════════════════════
-   OmniAgent Studio — Claude Code-style Dark Theme
+   OmniAgent Studio — Light Theme
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── CSS Variables ─────────────────────────────────────────────────── */
 :root {
-    --bg:    #1a1b1e;
-    --bg2:   #1e1f22;
-    --bg3:   #222327;
-    --bg4:   #2d2f34;
-    --bg5:   #2a2b2e;
-    --bg6:   #323338;
-    --bd:    #3a3b3e;
-    --bd2:   #4a4b50;
-    --tx:    #e1e1e3;
-    --tx2:   #9b9c9e;
-    --tx3:   #6b6c6e;
-    --ac:    #7c8aff;
-    --ac2:   #5b6aef;
-    --ac-bg: rgba(124, 138, 255, 0.08);
-    --ok:    #4ade80;
-    --ok-bg: rgba(74, 222, 128, 0.1);
-    --wn:    #f59e0b;
-    --wn-bg: rgba(245, 158, 11, 0.1);
-    --er:    #f87171;
-    --er-bg: rgba(248, 113, 113, 0.1);
+    --bg:    #ffffff;
+    --bg2:   #f8f9fa;
+    --bg3:   #f1f3f5;
+    --bg4:   #e9ecef;
+    --bg5:   #dee2e6;
+    --bg6:   #ced4da;
+    --bd:    #dee2e6;
+    --bd2:   #adb5bd;
+    --tx:    #212529;
+    --tx2:   #495057;
+    --tx3:   #868e96;
+    --ac:    #4263eb;
+    --ac2:   #3b5bdb;
+    --ac-bg: rgba(66, 99, 235, 0.08);
+    --ok:    #2b8a3e;
+    --ok-bg: rgba(43, 138, 62, 0.08);
+    --wn:    #e67700;
+    --wn-bg: rgba(230, 119, 0, 0.08);
+    --er:    #e03131;
+    --er-bg: rgba(224, 49, 49, 0.08);
     --font:  'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
     --mono:  'JetBrains Mono', 'Fira Code', Consolas, monospace;
     --radius: 8px;
     --radius-sm: 6px;
     --radius-lg: 12px;
-    --shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
     --transition: 0.15s ease;
 }
 
@@ -113,8 +113,8 @@ body {
     transition: all var(--transition);
 }
 
-.sidebar-item:hover { background: var(--bg5); color: var(--tx); }
-.sidebar-item.active { background: var(--bg3); color: var(--ac); }
+.sidebar-item:hover { background: var(--bg4); color: var(--tx); }
+.sidebar-item.active { background: var(--ac-bg); color: var(--ac); }
 
 .sidebar-spacer { flex: 1; }
 
@@ -248,7 +248,7 @@ body {
 
 .message.user .bubble {
     background: var(--ac-bg);
-    border-color: rgba(124, 138, 255, 0.2);
+    border-color: rgba(66, 99, 235, 0.15);
 }
 
 .message .bubble p { margin-bottom: 8px; }
@@ -290,7 +290,7 @@ body {
 .code-block .copy-btn:hover { background: var(--bg5); color: var(--tx); }
 
 .code-block pre {
-    background: var(--bg);
+    background: var(--bg2);
     padding: 12px 14px;
     margin: 0;
     overflow-x: auto;
@@ -331,17 +331,15 @@ body {
     align-items: center;
     gap: 8px;
     padding: 8px 12px;
-    background: var(--bg4);
+    background: var(--bg3);
     cursor: pointer;
     transition: background var(--transition);
     user-select: none;
 }
 
-.tool-call-header:hover { background: var(--bg5); }
+.tool-call-header:hover { background: var(--bg4); }
 
-.tool-call-header .tool-icon {
-    font-size: 14px;
-}
+.tool-call-header .tool-icon { font-size: 14px; }
 
 .tool-call-header .tool-name {
     font-family: var(--mono);
@@ -408,7 +406,8 @@ body {
     background: var(--ac-bg);
 }
 
-.pipeline-stage.completed { color: var(--tx2); }
+.pipeline-stage.completed { color: var(--ok); }
+.pipeline-stage.failed { color: var(--er); }
 
 .pipeline-stage .stage-status {
     width: 18px;
@@ -424,6 +423,57 @@ body {
     font-size: 10px;
     color: var(--tx3);
     font-family: var(--mono);
+}
+
+/* ── Approval Card ─────────────────────────────────────────────────── */
+.approval-card {
+    margin: 8px 0;
+    border: 1px solid var(--wn);
+    border-left: 3px solid var(--wn);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    background: var(--wn-bg);
+    animation: slideUp 0.2s ease;
+}
+
+.approval-card .approval-title {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--wn);
+    margin-bottom: 4px;
+}
+
+.approval-card .approval-desc {
+    font-size: 12px;
+    color: var(--tx2);
+    margin-bottom: 8px;
+}
+
+.approval-card .approval-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.approval-card .approval-actions button {
+    padding: 5px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--bd);
+    font-family: var(--font);
+    transition: all var(--transition);
+}
+
+.approval-card .btn-approve {
+    background: var(--ok);
+    color: #fff;
+    border-color: var(--ok);
+}
+
+.approval-card .btn-deny {
+    background: var(--bg3);
+    color: var(--tx);
 }
 
 /* ── Input Bar ─────────────────────────────────────────────────────── */
@@ -468,12 +518,12 @@ body {
 }
 
 .mode-btn:hover { color: var(--tx); background: var(--bg4); }
-.mode-btn.active { color: var(--tx); background: var(--bg4); box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.mode-btn.active { color: var(--ac); background: var(--bg); box-shadow: var(--shadow); }
 
 .input-wrapper {
     display: flex;
     gap: 8px;
-    background: var(--bg4);
+    background: var(--bg);
     border: 1px solid var(--bd);
     border-radius: var(--radius-lg);
     padding: 6px 8px 6px 14px;
@@ -500,10 +550,15 @@ body {
 
 #user-input::placeholder { color: var(--tx3); }
 
-#send-btn {
+.input-btns {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+#send-btn, #stop-btn {
     width: 32px;
     height: 32px;
-    background: var(--ac);
     border: none;
     border-radius: var(--radius);
     color: #fff;
@@ -515,8 +570,21 @@ body {
     transition: background var(--transition);
 }
 
+#send-btn {
+    background: var(--ac);
+}
+
 #send-btn:hover { background: var(--ac2); }
 #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+#stop-btn {
+    background: var(--er);
+    display: none;
+}
+
+#stop-btn:hover { opacity: 0.85; }
+
+#stop-btn.visible { display: flex; }
 
 /* ── Settings Modal ────────────────────────────────────────────────── */
 .modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; }
@@ -525,13 +593,13 @@ body {
 .modal-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.3);
     backdrop-filter: blur(4px);
 }
 
 .modal-content {
     position: relative;
-    background: var(--bg2);
+    background: var(--bg);
     border: 1px solid var(--bd);
     border-radius: var(--radius-lg);
     width: 600px;
@@ -539,7 +607,7 @@ body {
     max-height: 80vh;
     display: flex;
     flex-direction: column;
-    box-shadow: var(--shadow);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
 .modal-header {
@@ -563,7 +631,7 @@ body {
     transition: all var(--transition);
 }
 
-.modal-close:hover { background: var(--bg4); color: var(--tx); }
+.modal-close:hover { background: var(--bg3); color: var(--tx); }
 
 .modal-tabs {
     display: flex;
@@ -618,7 +686,7 @@ body {
 
 .model-tag:hover { border-color: var(--bd2); color: var(--tx); }
 .model-tag.selected { border-color: var(--ac); color: var(--ac); background: var(--ac-bg); }
-.model-tag.active-model { border-color: var(--ok); color: var(--ok); }
+.model-tag.active-model { border-color: var(--ok); color: var(--ok); background: var(--ok-bg); }
 
 /* ── Model Config Form ─────────────────────────────────────────────── */
 .config-form label {
@@ -634,7 +702,7 @@ body {
 .config-form input,
 .config-form textarea {
     width: 100%;
-    background: var(--bg4);
+    background: var(--bg2);
     border: 1px solid var(--bd);
     color: var(--tx);
     padding: 8px 10px;
@@ -680,7 +748,7 @@ body {
 .btn-secondary { background: var(--bg3); color: var(--tx); }
 .btn-secondary:hover { background: var(--bg4); }
 
-.btn-success { background: var(--ok); color: #000; border-color: var(--ok) !important; }
+.btn-success { background: var(--ok); color: #fff; border-color: var(--ok) !important; }
 .btn-success:hover { opacity: 0.9; }
 
 .config-form .result-msg {
@@ -718,7 +786,7 @@ body {
     transition: background var(--transition);
 }
 
-.agent-row:hover { background: var(--bg4); }
+.agent-row:hover { background: var(--bg3); }
 
 .agent-row .agent-dot {
     width: 8px;
@@ -730,7 +798,7 @@ body {
 
 .agent-row .agent-dot.running {
     background: var(--ok);
-    box-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
+    box-shadow: 0 0 6px rgba(43, 138, 62, 0.4);
     animation: pulse 1.5s infinite;
 }
 
@@ -746,7 +814,7 @@ body {
     transition: background var(--transition);
 }
 
-.tool-row:hover { background: var(--bg4); }
+.tool-row:hover { background: var(--bg3); }
 
 .tool-row .tool-name-display {
     font-family: var(--mono);

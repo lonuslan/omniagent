@@ -1,5 +1,8 @@
 """
 OmniAgent Studio — Windows Desktop Application.
+
+GUI backend: connects pywebview frontend to the orchestrator, LLM bridge,
+agent registry, and tool executor.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ from ..core.analyzer import TaskAnalyzer
 from ..core.llm_bridge import LLMBridge
 from ..core.orchestrator import Orchestrator, OrchestratorConfig
 from ..core.registry import AgentRegistry
-from ..protocol import Task
+from ..protocol import AgentCapability
 from ..runtime.security import ExecutionMode, PermissionHandler
 from ..runtime.executor import ToolExecutor
 from ..tools.base import ToolRegistry
@@ -125,13 +128,14 @@ BUILTIN_MODELS = [
 
 
 class OmniAgentAPI:
-    """JS ↔ Python bridge."""
+    """JS <-> Python bridge for pywebview."""
 
     def __init__(self) -> None:
         self._registry: AgentRegistry | None = None
         self._orchestrator: Orchestrator | None = None
         self._lock = threading.Lock()
         self._running = False
+        self._stop_flag = False
         self._events: queue.Queue = queue.Queue()
         self._mode: ExecutionMode = ExecutionMode.AGENT
         self._permissions = PermissionHandler(self._mode)
@@ -139,6 +143,8 @@ class OmniAgentAPI:
         self._model_configs: dict[str, dict] = {}
         self._active_model_id: str = ""
         self._llm_bridge = LLMBridge()
+        self._pending_approvals: list[dict] = []
+        self._conversation_history: list[dict] = []
         self._setup_registry()
 
     def _setup_registry(self) -> None:
@@ -155,7 +161,7 @@ class OmniAgentAPI:
         self._tool_registry = tool_reg
         self._tool_executor = ToolExecutor(tool_reg, self._permissions)
         config = OrchestratorConfig(max_retries_per_stage=2, parallel_stages=True)
-        self._orchestrator = Orchestrator(registry, config=config)
+        self._orchestrator = Orchestrator(registry, config=config, llm_bridge=self._llm_bridge)
 
     # ── Mode ────────────────────────────────────────────────────────────
 
@@ -184,7 +190,6 @@ class OmniAgentAPI:
         })
 
     def get_model_defaults(self, model_id: str) -> str:
-        """Return detailed default config for a model based on official docs."""
         model = next((m for m in BUILTIN_MODELS if m["id"] == model_id), None)
         if not model:
             return json.dumps({"status": "error", "message": "Unknown model"})
@@ -207,7 +212,6 @@ class OmniAgentAPI:
         })
 
     def save_model_config(self, model_id: str, config_json: str) -> str:
-        """Save full model configuration from JSON."""
         try:
             cfg = json.loads(config_json)
             api_key = cfg.get("api_key", "")
@@ -232,7 +236,6 @@ class OmniAgentAPI:
         # Wire LLM provider into orchestrator's analyzer
         provider = self._llm_bridge.get_provider()
         if provider and self._orchestrator:
-            from ..core.analyzer import TaskAnalyzer
             self._orchestrator.analyzer = TaskAnalyzer(llm_provider=provider)
         return json.dumps({"status": "ok", "active_model": model_id})
 
@@ -312,125 +315,440 @@ class OmniAgentAPI:
             "providers": self._llm_bridge.list_configured(),
         })
 
-    # ── Real LLM Execution ──────────────────────────────────────────────
+    # ── Task Execution ──────────────────────────────────────────────────
 
     def execute_task(self, task_text: str) -> str:
         """Execute a task using real LLM if configured, fallback to demo."""
+        # Handle special commands
+        if task_text.strip().startswith("/"):
+            return self._handle_command(task_text.strip())
+
         with self._lock:
             if self._running:
                 return json.dumps({"status": "error", "message": "Already running"})
             self._running = True
+            self._stop_flag = False
             self._events = queue.Queue()
+
+        # Store conversation entry
+        self._conversation_history.append({"role": "user", "content": task_text})
 
         provider = self._llm_bridge.get_provider()
         if provider and self._active_model_id:
-            threading.Thread(target=self._real_llm_thread, args=(task_text, provider), daemon=True).start()
+            threading.Thread(target=self._real_llm_thread, args=(task_text,), daemon=True).start()
             return json.dumps({"status": "started", "mode": "llm"})
         else:
-            threading.Thread(target=self._demo_thread, daemon=True).start()
+            threading.Thread(target=self._demo_thread, args=(task_text,), daemon=True).start()
             return json.dumps({"status": "started", "mode": "demo"})
 
-    def _real_llm_thread(self, task_text: str, provider) -> None:
-        """Real LLM-powered task execution."""
-        try:
-            self._emit("system", f"🤖 使用 {self._active_model_id} 进行任务分析…", "system")
-            time.sleep(0.3)
+    def stop_task(self) -> str:
+        """Signal the running task to stop."""
+        if not self._running:
+            return json.dumps({"status": "error", "message": "No task running"})
+        self._stop_flag = True
+        return json.dumps({"status": "ok"})
 
-            # Step 1: LLM Analysis
-            self._emit("orchestrator", "正在分析任务…", "thinking")
-            analysis_prompt = f"""Analyze this task and return JSON:
+    def _handle_command(self, cmd: str) -> str:
+        """Handle slash commands from chat input."""
+        parts = cmd.split(maxsplit=1)
+        command = parts[0].lower()
+        responses = {
+            "/help": "可用命令:\n  /help — 显示帮助\n  /status — 系统状态\n  /clear — 清空对话\n  /models — 已配置模型\n  /agents — 已注册 Agent\n  /tools — 已注册工具\n  /workflows — 可用工作流模板",
+            "/clear": "__CLEAR__",
+        }
+        if command in responses:
+            resp = responses[command]
+            if resp == "__CLEAR__":
+                return json.dumps({"status": "started", "mode": "command", "action": "clear"})
+            self._emit("system", resp, "info")
+            return json.dumps({"status": "started", "mode": "command"})
+        elif command == "/status":
+            info = self.get_system_info()
+            self._emit("system", f"系统状态:\n```json\n{info}\n```", "info")
+            return json.dumps({"status": "started", "mode": "command"})
+        elif command == "/models":
+            models = [m for m in BUILTIN_MODELS if m["id"] in self._model_configs]
+            if models:
+                lines = [f"  {m['id']} — {m['name']}" for m in models]
+                self._emit("system", f"已配置模型:\n" + "\n".join(lines), "info")
+            else:
+                self._emit("system", "未配置任何模型。请在设置中配置 API Key。", "warning")
+            return json.dumps({"status": "started", "mode": "command"})
+        elif command == "/agents":
+            agents = self._registry.list_all() if self._registry else []
+            lines = [f"  {d.id} — {d.name} [{', '.join(c.value for c in d.capabilities[:3])}]" for d in agents]
+            self._emit("system", f"已注册 Agent ({len(agents)}):\n" + "\n".join(lines), "info")
+            return json.dumps({"status": "started", "mode": "command"})
+        elif command == "/tools":
+            tools = self._tool_registry.list_descriptors() if hasattr(self, '_tool_registry') else []
+            lines = [f"  {t.name} — {t.description[:50]}" for t in tools]
+            self._emit("system", f"已注册工具 ({len(tools)}):\n" + "\n".join(lines), "info")
+            return json.dumps({"status": "started", "mode": "command"})
+        elif command == "/workflows":
+            workflows = self._orchestrator.list_workflows() if self._orchestrator else []
+            if workflows:
+                lines = []
+                for wf in workflows:
+                    stage_names = " → ".join(s["name"] for s in wf["stages"])
+                    lines.append(f"  {wf['name']} — {wf['description']}\n    {stage_names}")
+                self._emit("system", f"可用工作流 ({len(workflows)}):\n" + "\n".join(lines), "info")
+            else:
+                self._emit("system", "无可用工作流模板。", "warning")
+            return json.dumps({"status": "started", "mode": "command"})
+        else:
+            self._emit("system", f"未知命令: {command}。输入 /help 查看可用命令。", "warning")
+            return json.dumps({"status": "started", "mode": "command"})
+
+    # ── Real LLM Execution (via LLMBridge) ──────────────────────────────
+
+    def _real_llm_thread(self, task_text: str) -> None:
+        """Real LLM-powered task execution using LLMBridge.complete_sync()."""
+        try:
+            model_name = self._active_model_id
+            self._emit("system", f"使用 {model_name} 分析任务…", "system")
+            time.sleep(0.2)
+
+            # Phase 1: Task Analysis via LLM
+            self._emit("orchestrator", "正在分析任务需求…", "thinking")
+            analysis_prompt = f"""分析以下任务，返回JSON格式:
 {{
   "domain": "software|video|document|data|general",
-  "summary": "one sentence",
-  "tech_stack": ["techs"],
-  "stages": [{{"name":"Stage","description":"what to do","capabilities":["code_generation"]}}]
+  "summary": "一句话概述",
+  "tech_stack": ["技术栈"],
+  "complexity": "low|medium|high",
+  "stages": [
+    {{"name": "阶段名称", "description": "具体做什么", "capabilities": ["code_generation"]}}
+  ]
 }}
-Task: {task_text}"""
+任务: {task_text}"""
 
-            try:
-                completion = provider.complete_sync(
-                    model=self._active_model_id,
-                    messages=[{"role": "user", "content": analysis_prompt}],
-                    max_tokens=800, temperature=0.3,
-                )
-                content = completion.get("content", "") if isinstance(completion, dict) else str(completion)
-                # Try to extract JSON
-                json_start = content.find("{")
-                json_end = content.rfind("}") + 1
-                if json_start >= 0 and json_end > json_start:
-                    analysis = json.loads(content[json_start:json_end])
-                else:
-                    analysis = {"domain": "general", "summary": task_text[:80],
-                                "stages": [{"name": "执行任务", "description": task_text, "capabilities": ["general_purpose"]}]}
-            except Exception as e:
-                self._emit("orchestrator", f"LLM 分析失败: {e}，使用规则分析", "warning")
-                analysis = {"domain": "general", "summary": task_text[:80],
-                            "stages": [{"name": "执行任务", "description": task_text, "capabilities": ["general_purpose"]}]}
+            result = self._llm_bridge.complete_sync(
+                model=model_name,
+                messages=[{"role": "user", "content": analysis_prompt}],
+                max_tokens=800, temperature=0.3,
+            )
+            content = result.get("content", "") if isinstance(result, dict) else str(result)
+
+            if result.get("error"):
+                self._emit("orchestrator", f"LLM 调用失败: {result['error']}，使用规则分析", "warning")
+                analysis = self._rule_based_analysis(task_text)
+            else:
+                analysis = self._parse_analysis(content, task_text)
 
             domain = analysis.get("domain", "general")
-            stages = analysis.get("stages", [{"name": "执行", "description": task_text, "capabilities": ["general_purpose"]}])
-            self._emit("orchestrator", f"领域: {domain} | 分解为 {len(stages)} 个阶段", "success")
+            stages = analysis.get("stages", [])
+            complexity = analysis.get("complexity", "medium")
+            summary = analysis.get("summary", task_text[:80])
+
+            self._emit("orchestrator", f"领域: {domain} | 复杂度: {complexity} | {len(stages)} 个阶段", "success")
+            self._emit("orchestrator", f"任务概述: {summary}", "info")
+
+            if not stages:
+                stages = [{"name": "执行任务", "description": task_text, "capabilities": ["general_purpose"]}]
+
+            # Init pipeline visualization
             self._action("init_pipeline", count=len(stages), stages=[
-                {"name": s["name"], "emoji": "▶️"} for s in stages
+                {"name": s["name"], "emoji": self._stage_emoji(s)} for s in stages
             ])
-            time.sleep(0.3)
+            time.sleep(0.2)
 
-            # Step 2: Execute stages with LLM
+            # Phase 2: Execute each stage
+            context_accumulator = []
             for i, stage in enumerate(stages):
+                if self._stop_flag:
+                    self._emit("system", "任务已取消", "warning")
+                    break
+
                 stage_name = stage.get("name", f"Stage {i+1}")
-                self._action("stage_update", index=i, status="running", agent="llm-agent")
-                self._emit("llm-agent", f"执行: {stage_name}", "thinking")
+                stage_desc = stage.get("description", "")
+                caps = stage.get("capabilities", ["general_purpose"])
 
-                try:
-                    stage_prompt = f"""You are executing stage '{stage_name}' of a larger task.
-Task: {task_text}
-Stage description: {stage.get('description', '')}
-Previous context: {analysis.get('summary', '')}
+                # Find best agent for this stage
+                agent_id, agent_name, score, breakdown = self._find_agent_for_stage(caps, task_text)
+                self._action("stage_update", index=i, status="running", agent=agent_id)
+                self._emit(agent_id, f"开始: {stage_name} (综合评分: {score:.0%})", "thinking")
+                if breakdown:
+                    self._emit("orchestrator", f"评分详情: {breakdown}", "info")
 
-Complete this stage. Be specific and actionable. Output the result directly (no JSON wrapper needed).
-Response language: Chinese if the task is in Chinese, otherwise English."""
-                    result = provider.complete_sync(
-                        model=self._active_model_id,
-                        messages=[{"role": "user", "content": stage_prompt}],
-                        max_tokens=600, temperature=0.5,
+                # Build context from previous stages
+                context_str = ""
+                if context_accumulator:
+                    context_str = "\n前序阶段结果:\n" + "\n".join(
+                        f"- {c['stage']}: {c['summary']}" for c in context_accumulator[-3:]
                     )
-                    content = result.get("content", str(result)) if isinstance(result, dict) else str(result)
-                    self._emit("llm-agent", content[:200], "success")
-                except Exception as e:
-                    self._emit("llm-agent", f"阶段执行失败: {e}", "error")
 
-                self._action("stage_update", index=i, status="completed")
-                time.sleep(0.2)
+                # Agent mode: emit approval request
+                if self._mode == ExecutionMode.AGENT:
+                    approval = {
+                        "id": str(uuid.uuid4()),
+                        "stage": i,
+                        "agent": agent_name,
+                        "action": f"执行阶段: {stage_name}",
+                        "description": stage_desc,
+                    }
+                    self._pending_approvals.append(approval)
+                    self._emit("approval_request", json.dumps(approval), "warning")
+                    # Wait for approval (poll every 100ms, timeout 60s)
+                    waited = 0
+                    while approval in self._pending_approvals and waited < 600 and not self._stop_flag:
+                        time.sleep(0.1)
+                        waited += 1
+                    if approval not in self._pending_approvals:
+                        # Check if denied
+                        if approval.get("denied"):
+                            self._emit(agent_id, f"阶段 {stage_name} 被拒绝", "warning")
+                            self._action("stage_update", index=i, status="failed")
+                            continue
+                    elif self._stop_flag:
+                        break
 
-            self._emit("system", f"✅ 任务完成 — 共 {len(stages)} 个阶段，模型: {self._active_model_id}", "success")
+                # Execute stage via LLM
+                stage_prompt = f"""你正在执行多阶段任务的第 {i+1}/{len(stages)} 阶段。
+任务: {task_text}
+当前阶段: {stage_name}
+阶段描述: {stage_desc}
+{context_str}
+
+请直接完成这个阶段的工作，输出具体、可执行的结果。
+语言: 如果任务是中文则用中文，否则用英文。"""
+
+                stage_result = self._llm_bridge.complete_sync(
+                    model=model_name,
+                    messages=[{"role": "user", "content": stage_prompt}],
+                    max_tokens=1200, temperature=0.5,
+                )
+                stage_content = stage_result.get("content", "") if isinstance(stage_result, dict) else str(stage_result)
+
+                if stage_result.get("error"):
+                    self._emit(agent_id, f"阶段执行失败: {stage_result['error']}", "error")
+                    self._action("stage_update", index=i, status="failed")
+                    self._orchestrator.scorer.record_failure(agent_id)
+                else:
+                    # Show result (truncated for display)
+                    display_text = stage_content[:500] + ("…" if len(stage_content) > 500 else "")
+                    self._emit(agent_id, display_text, "success")
+                    self._action("stage_update", index=i, status="completed")
+                    self._orchestrator.scorer.record_success(agent_id)
+
+                    # LLM-based context summarization for next stages
+                    summary = self._orchestrator.summarize_output(stage_name, agent_name, stage_content)
+                    context_accumulator.append({
+                        "stage": stage_name,
+                        "agent": agent_name,
+                        "summary": summary,
+                    })
+
+                time.sleep(0.15)
+
+            if not self._stop_flag:
+                self._emit("system", f"任务完成 — {len(stages)} 个阶段, 模型: {model_name}", "success")
+                self._conversation_history.append({"role": "assistant", "content": f"完成 {len(stages)} 个阶段"})
+
         except Exception as e:
             self._emit("system", f"执行错误: {e}", "error")
         finally:
             with self._lock:
                 self._running = False
-            self._action("demo_complete")
+                self._stop_flag = False
+            self._action("task_complete")
 
-    # ── Demo ────────────────────────────────────────────────────────────
+    def _rule_based_analysis(self, task_text: str) -> dict:
+        """Fallback rule-based analysis when LLM is unavailable."""
+        text_lower = task_text.lower()
+        if any(k in text_lower for k in ["代码", "编程", "开发", "code", "build", "api"]):
+            domain = "software"
+            stages = [
+                {"name": "需求分析", "description": "分析功能需求", "capabilities": ["general_purpose"]},
+                {"name": "架构设计", "description": "设计系统架构", "capabilities": ["architecture_design"]},
+                {"name": "代码实现", "description": "编写核心代码", "capabilities": ["code_generation"]},
+                {"name": "代码审查", "description": "审查代码质量", "capabilities": ["code_review"]},
+                {"name": "测试", "description": "编写和运行测试", "capabilities": ["testing"]},
+            ]
+        elif any(k in text_lower for k in ["文档", "文章", "写作", "document", "write"]):
+            domain = "document"
+            stages = [
+                {"name": "内容规划", "description": "规划文档结构", "capabilities": ["general_purpose"]},
+                {"name": "撰写初稿", "description": "撰写文档内容", "capabilities": ["documentation"]},
+                {"name": "审校修订", "description": "审校和修订", "capabilities": ["code_review"]},
+            ]
+        else:
+            domain = "general"
+            stages = [
+                {"name": "理解需求", "description": "分析任务需求", "capabilities": ["general_purpose"]},
+                {"name": "执行任务", "description": task_text, "capabilities": ["general_purpose"]},
+                {"name": "输出结果", "description": "整理输出结果", "capabilities": ["documentation"]},
+            ]
+        return {"domain": domain, "summary": task_text[:80], "stages": stages, "complexity": "medium"}
 
-    def run_demo(self) -> str:
-        if self._running: return json.dumps({"status": "error", "message": "Already running"})
-        self._running = True; self._events = queue.Queue()
-        threading.Thread(target=self._demo_thread, daemon=True).start()
-        return json.dumps({"status": "started"})
+    def _parse_analysis(self, content: str, task_text: str) -> dict:
+        """Parse LLM analysis response, extracting JSON."""
+        try:
+            json_start = content.find("{")
+            json_end = content.rfind("}") + 1
+            if json_start >= 0 and json_end > json_start:
+                return json.loads(content[json_start:json_end])
+        except json.JSONDecodeError:
+            pass
+        return self._rule_based_analysis(task_text)
+
+    def _find_agent_for_stage(self, capabilities: list[str], task_desc: str = "") -> tuple[str, str, float, str]:
+        """Find the best matching agent using composite scorer. Returns (id, name, score, breakdown_str)."""
+        if not self._registry:
+            return "general-agent", "GeneralAgent", 0.5, ""
+        caps = []
+        for c in capabilities:
+            try:
+                caps.append(AgentCapability(c))
+            except ValueError:
+                pass
+        if not caps:
+            caps = [AgentCapability.GENERAL_PURPOSE]
+        candidates = self._registry.find_by_capability(caps)
+        if not candidates:
+            return "general-agent", "GeneralAgent", 0.5, ""
+
+        agent_descs = [desc for desc, _ in candidates]
+        use_llm = bool(self._llm_bridge.is_configured())
+        breakdowns = self._orchestrator.scorer.rank_agents(
+            task_desc, agent_descs, caps, use_llm=use_llm,
+        )
+        if breakdowns:
+            best = breakdowns[0]
+            breakdown_str = (
+                f"cap:{best.capability_score:.0%} llm:{best.llm_score:.0%} "
+                f"rep:{best.reputation_score:.0%}"
+            )
+            if best.llm_reasoning:
+                breakdown_str += f" — {best.llm_reasoning}"
+            return best.agent_id, best.agent_name, best.composite_score, breakdown_str
+        return "general-agent", "GeneralAgent", 0.5, ""
+
+    def _stage_emoji(self, stage: dict) -> str:
+        """Pick an emoji for a stage based on its capabilities."""
+        caps = stage.get("capabilities", [])
+        emoji_map = {
+            "code_generation": "💻", "code_review": "🔍", "architecture_design": "🏗️",
+            "testing": "🧪", "deployment": "🚀", "documentation": "📝",
+            "ui_design": "🎨", "data_analysis": "📊", "general_purpose": "▶️",
+        }
+        for c in caps:
+            if c in emoji_map:
+                return emoji_map[c]
+        return "▶️"
+
+    # ── Demo Mode ───────────────────────────────────────────────────────
+
+    def _demo_thread(self, task_text: str) -> None:
+        try:
+            self._run_demo(task_text)
+        except Exception as e:
+            self._emit("system", f"Error: {e}", "error")
+        finally:
+            with self._lock:
+                self._running = False
+                self._stop_flag = False
+            self._action("task_complete")
+
+    def _run_demo(self, task_text: str) -> None:
+        """Demo mode: shows analysis + simulated stages, using actual user input."""
+        self._emit("system", "未配置 LLM，使用演示模式", "warning")
+        time.sleep(0.2)
+
+        # Show registered agents
+        agents = self._registry.list_all() if self._registry else []
+        self._emit("system", f"已注册 {len(agents)} 个 Agent，{len(self._tool_registry.list_descriptors())} 个工具", "info")
+        time.sleep(0.1)
+
+        # Rule-based analysis (same as LLM fallback)
+        analysis = self._rule_based_analysis(task_text)
+        domain = analysis["domain"]
+        stages = analysis["stages"]
+
+        self._emit("orchestrator", f"任务分析 — 领域: {domain}, 分解为 {len(stages)} 个阶段", "success")
+        self._emit("orchestrator", f"概述: {analysis['summary']}", "info")
+        time.sleep(0.2)
+
+        # Init pipeline
+        self._action("init_pipeline", count=len(stages), stages=[
+            {"name": s["name"], "emoji": self._stage_emoji(s)} for s in stages
+        ])
+        time.sleep(0.15)
+
+        # Execute stages
+        for i, stage in enumerate(stages):
+            if self._stop_flag:
+                self._emit("system", "任务已取消", "warning")
+                break
+
+            stage_name = stage["name"]
+            caps = stage.get("capabilities", ["general_purpose"])
+            agent_id, agent_name, score, breakdown = self._find_agent_for_stage(caps, task_text)
+
+            self._action("stage_update", index=i, status="running", agent=agent_id)
+            self._emit(agent_id, f"开始: {stage_name} (综合评分: {score:.0%})", "thinking")
+            if breakdown:
+                self._emit("orchestrator", f"评分详情: {breakdown}", "info")
+            time.sleep(0.5)
+
+            self._emit(agent_id, f"完成阶段: {stage_name}（演示模式，配置 LLM 以获取真实结果）", "success")
+            self._action("stage_update", index=i, status="completed")
+            time.sleep(0.1)
+
+        if not self._stop_flag:
+            self._emit("system", f"演示完成 — {len(stages)} 个阶段。配置 LLM 启用真实执行。", "success")
+
+    # ── Approvals ───────────────────────────────────────────────────────
+
+    def get_pending_approvals(self) -> str:
+        return json.dumps(self._pending_approvals)
+
+    def approve_tool(self, approval_id: str) -> str:
+        for a in self._pending_approvals:
+            if a["id"] == approval_id:
+                self._pending_approvals.remove(a)
+                return json.dumps({"status": "ok"})
+        return json.dumps({"status": "error", "message": "Not found"})
+
+    def deny_tool(self, approval_id: str) -> str:
+        for a in self._pending_approvals:
+            if a["id"] == approval_id:
+                a["denied"] = True
+                self._pending_approvals.remove(a)
+                return json.dumps({"status": "ok"})
+        return json.dumps({"status": "error", "message": "Not found"})
+
+    # ── Events ──────────────────────────────────────────────────────────
 
     def poll_events(self) -> str:
         events = []
         while True:
-            try: events.append(self._events.get_nowait())
-            except queue.Empty: break
+            try:
+                events.append(self._events.get_nowait())
+            except queue.Empty:
+                break
         return json.dumps(events)
+
+    def _emit(self, source, message, level="info"):
+        self._events.put({"type": "event", "source": source, "message": message, "level": level})
+
+    def _action(self, action, **kw):
+        self._events.put({"type": "action", "action": action, **kw})
+
+    def _emit_tool_call(self, tool_name: str, args: dict, result: str, is_error: bool = False):
+        self._events.put({
+            "type": "tool_call", "tool": tool_name,
+            "args": args, "result": str(result)[:500], "error": is_error,
+        })
+
+    # ── Status ──────────────────────────────────────────────────────────
 
     def get_status(self) -> str:
         return json.dumps({"running": self._running, "mode": self._mode.value,
                            "agents": len(self._registry.list_all()) if self._registry else 0})
 
     def get_agents(self) -> str:
-        if not self._registry: return "[]"
+        if not self._registry:
+            return "[]"
         return json.dumps([{
             "id": d.id, "name": d.name,
             "capabilities": [c.value for c in d.capabilities],
@@ -438,7 +756,8 @@ Response language: Chinese if the task is in Chinese, otherwise English."""
         } for d in self._registry.list_all()])
 
     def get_tools(self) -> str:
-        if not hasattr(self, '_tool_registry'): return "[]"
+        if not hasattr(self, '_tool_registry'):
+            return "[]"
         return json.dumps([{
             "name": t.name, "description": t.description,
             "category": t.category, "requires_approval": t.requires_approval,
@@ -455,11 +774,9 @@ Response language: Chinese if the task is in Chinese, otherwise English."""
         return "[]"
 
     def get_conversations(self) -> str:
-        """Return conversation history list. Placeholder for future persistence."""
-        return json.dumps([])
+        return json.dumps(self._conversation_history[-50:])
 
     def get_system_info(self) -> str:
-        """Return system status information for the status bar."""
         return json.dumps({
             "running": self._running,
             "mode": self._mode.value,
@@ -468,49 +785,32 @@ Response language: Chinese if the task is in Chinese, otherwise English."""
             "tools": len(self._tool_registry.list_descriptors()) if hasattr(self, '_tool_registry') else 0,
         })
 
-    def _emit(self, source, message, level="info"):
-        self._events.put({"type": "event", "source": source, "message": message, "level": level})
+    # ── Workflows ───────────────────────────────────────────────────────
 
-    def _action(self, action, **kw):
-        self._events.put({"type": "action", "action": action, **kw})
+    def list_workflows(self) -> str:
+        """Return all available workflow templates."""
+        if not self._orchestrator:
+            return "[]"
+        return json.dumps(self._orchestrator.list_workflows())
 
-    def _emit_tool_call(self, tool_name: str, args: dict, result: str, is_error: bool = False):
-        self._events.put({
-            "type": "tool_call", "tool": tool_name,
-            "args": args, "result": str(result)[:500], "error": is_error,
-        })
-
-    def _demo_thread(self):
-        try: self._run_demo()
-        except Exception as e: self._emit("system", f"Error: {e}", "error")
-        finally:
-            with self._lock:
-                self._running = False
-            self._action("demo_complete")
-
-    def _run_demo(self):
-        self._emit("system", "⚠️ 未配置 LLM，使用 Demo 模式", "warning")
-        time.sleep(0.3)
-        for desc in (self._registry or AgentRegistry()).list_all():
-            self._emit("system", f"Registered: {desc.name}", "info"); time.sleep(0.04)
-        self._emit("system", "Demo orchestrator ready.", "success"); time.sleep(0.2)
-
-        stages = [{"name": "需求确认", "emoji": "📋"}, {"name": "需求分析", "emoji": "🔬"},
-                   {"name": "原型设计", "emoji": "🎨"}, {"name": "前端开发", "emoji": "💻"},
-                   {"name": "后端开发", "emoji": "⚙️"}, {"name": "测试", "emoji": "🧪"},
-                   {"name": "部署上线", "emoji": "🚀"}]
-        self._action("init_pipeline", count=7, stages=stages); time.sleep(0.2)
-        self._emit("orchestrator", "Decomposed into 7 stages (demo)", "info")
-
-        amap = {0: "general-agent", 1: "doc-writer-agent", 2: "code-gen-agent",
-                3: "code-gen-agent", 4: "code-gen-agent", 5: "test-agent", 6: "general-agent"}
-        for i, s in enumerate(stages):
-            aid = amap.get(i, "general-agent")
-            self._action("stage_update", index=i, status="running", agent=aid)
-            self._emit(aid, f"Starting: {s['name']}", "thinking"); time.sleep(0.6)
-            self._emit(aid, f"Completed stage: {s['name']} (demo)", "success")
-            self._action("stage_update", index=i, status="completed"); time.sleep(0.1)
-        self._emit("system", "Demo complete. 配置 LLM 以启用真实调用。", "success")
+    def register_workflow(self, config_json: str) -> str:
+        """Register a custom workflow from JSON config."""
+        try:
+            cfg = json.loads(config_json)
+            name = cfg.get("name", "")
+            description = cfg.get("description", "")
+            stages = cfg.get("stages", [])
+            if not name or not stages:
+                return json.dumps({"status": "error", "message": "name and stages required"})
+            import asyncio
+            loop = asyncio.new_event_loop()
+            loop.run_until_complete(
+                self._orchestrator.register_custom_workflow(name, description, stages)
+            )
+            loop.close()
+            return json.dumps({"status": "ok", "name": name, "stages": len(stages)})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
 
 
 def get_assets_dir() -> Path:
@@ -520,7 +820,8 @@ def get_assets_dir() -> Path:
 def launch_gui() -> None:
     assets = get_assets_dir()
     html_path = assets / "index.html"
-    if not html_path.exists(): raise FileNotFoundError(str(html_path))
+    if not html_path.exists():
+        raise FileNotFoundError(str(html_path))
     api = OmniAgentAPI()
     webview.create_window(
         title="OmniAgent Studio",
