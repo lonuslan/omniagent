@@ -6,7 +6,7 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-41%20passed-success.svg)]()
+[![Tests](https://img.shields.io/badge/tests-233%20passed-success.svg)]()
 
 *一个 Agent 做一件事，一百个 Agent 协作完成一个项目*
 
@@ -30,9 +30,10 @@
 | 领域范围 | 专注编程 | **编程、视频、文档、数据……任意领域** |
 | 工作流程 | 无固定流程 | **内置专业 Workflow（需求→设计→编码→测试→部署）** |
 | Agent 选择 | 手动指定 | **自动分析 + 能力匹配评分** |
-| 扩展性 | 插件/扩展 | **三源 Agent 生态（内置/自定义/Marketplace）** |
+| 扩展性 | 插件/扩展 | **三源 Agent 生态（内置/自定义/Marketplace）+ Skill 系统** |
 | 协作方式 | 无 | **消息总线 + Handoff 协议 + Request/Response** |
 | 界面 | CLI/TUI | **Windows 桌面应用 + TUI** |
+| 企业治理 | 无 | **RBAC + 审计日志 + 私有市场 + SSO** |
 
 ---
 
@@ -67,6 +68,31 @@ Orchestrator 自动分析:
 | 文档写作 | 大纲→初稿→审阅→定稿 | Documentation, Copywriting |
 | 数据分析 | 采集→清洗→分析→可视化 | DataAnalysis |
 
+### Skill 系统
+
+可复用的指令包，通过 SKILL.md 规范定义，自动注入 Agent 运行时上下文：
+
+```
+~/.omniagent/skills/
+├── code-style-python/SKILL.md    # Python 代码风格
+├── security-review/SKILL.md      # 安全审查规范
+└── api-design/SKILL.md           # API 设计指南
+```
+
+- **YAML front-matter + Markdown** 格式，无需额外依赖
+- **自动发现**：扫描项目级和用户级目录
+- **能力/触发词匹配**：按任务上下文自动激活
+- **Git 安装**：一行命令从 GitHub 安装技能
+
+### 企业版功能
+
+| 功能 | 说明 |
+|------|------|
+| **RBAC** | ADMIN / DEVELOPER / VIEWER 三级角色，细粒度权限控制 |
+| **审计日志** | SQLite 持久化，支持时间范围/工具/用户/错误筛选 |
+| **私有市场** | 企业内部 Agent/Skill 目录，发布→审批→安装全流程 |
+| **SSO/LDAP** | 认证接口 + Mock 实现，预留 LDAP/OIDC 扩展 |
+
 ### 三源 Agent 生态
 
 ```
@@ -89,15 +115,17 @@ builtin (内置)          custom (自定义)         marketplace (社区)
 ├─────────────────────────────────────────────────────────┤
 │  GUI (pywebview) │ TUI (textual) │ CLI (typer)          │
 ├─────────────────────────────────────────────────────────┤
-│  Orchestrator (任务分析 → 能力匹配 → Agent分配)           │
+│  Orchestrator (任务分析 → 能力匹配 → Agent分配 → Skill注入)│
 ├─────────────────────────────────────────────────────────┤
-│  Registry │ Workflow Engine │ Collaboration Bus          │
+│  Registry │ Workflow Engine │ Skill Registry │ Collab Bus│
 ├─────────────────────────────────────────────────────────┤
-│  Agent Runtime (沙箱隔离 │ LLM 连接池 │ 工具执行)         │
+│  Agent Runtime (沙箱隔离 │ LLM 连接池 │ 工具执行 │ 文件锁) │
 ├─────────────────────────────────────────────────────────┤
-│  Security (Plan/Agent/Auto 三种权限模式)                  │
+│  Security (Plan/Agent/Auto) │ RBAC │ Audit Store        │
 ├─────────────────────────────────────────────────────────┤
 │  LLM Providers (MiMo │ DeepSeek │ Claude │ OpenAI)      │
+├─────────────────────────────────────────────────────────┤
+│  Enterprise (Private Marketplace │ Auth (SSO/LDAP))      │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -107,14 +135,16 @@ builtin (内置)          custom (自定义)         marketplace (社区)
 |------|------|------|
 | **Protocol** | `protocol.py` | 核心类型系统、Agent/Task/Message/Event 定义 |
 | **Registry** | `core/registry.py` | Agent 注册、发现、能力匹配评分算法 |
-| **Orchestrator** | `core/orchestrator.py` | 任务分析、分解、Agent 选择、执行协调 |
+| **Orchestrator** | `core/orchestrator.py` | 任务分析、分解、Agent 选择、执行协调、Skill 注入 |
 | **Workflow** | `core/workflow.py` | 多阶段工作流模板（软件/视频/文档） |
+| **Skills** | `skills/` | SKILL.md 解析、扫描、注册、安装、社区仓库 |
 | **Collaboration** | `collaboration/bus.py` | Agent 间消息总线、Handoff 协议 |
-| **Runtime** | `runtime/` | Agent 沙箱、LLM 连接池、工具执行器、事件流 |
+| **Runtime** | `runtime/` | Agent 沙箱、LLM 连接池、工具执行器、事件流、文件锁 |
 | **Security** | `runtime/security.py` | Plan/Agent/Auto 三种执行模式 + 工作区策略 |
+| **Enterprise** | `enterprise/` | RBAC、审计日志、私有市场、SSO/LDAP 认证 |
 | **LLM** | `llm/` | 统一 Provider 层（MiMo/DeepSeek/Claude/OpenAI） |
 | **Tools** | `tools/` | 声明式工具框架，兼容 Function Calling |
-| **GUI** | `gui/` | Windows 桌面应用（pywebview + HTML/CSS） |
+| **GUI** | `gui/` | Windows 桌面应用（pywebview + HTML/CSS/JS） |
 | **TUI** | `tui/` | 终端仪表盘（textual 框架） |
 
 ### 内置 Agent
@@ -139,7 +169,7 @@ builtin (内置)          custom (自定义)         marketplace (社区)
 ### 安装
 
 ```bash
-git clone https://github.com/your-org/omniagent.git
+git clone https://github.com/lonuslan/omniagent.git
 cd omniagent
 pip install -e ".[dev]"
 ```
@@ -164,15 +194,31 @@ omniagent agent list
 
 ```bash
 pytest tests/ -v
-# 41 tests passed
+# 233 tests passed
 ```
 
-### 运行 Demo
+---
 
-```bash
-python examples/demo_software_project.py   # 软件开发全流程
-python examples/demo_video_production.py    # 视频制作全流程
-```
+## GUI 界面
+
+Settings 面板包含 7 个 Tab：
+
+| Tab | 功能 |
+|-----|------|
+| **Models** | LLM 模型配置、API Key 管理、连接测试 |
+| **Agents** | 查看已注册 Agent 列表及能力 |
+| **Tools** | 查看可用工具及审批状态 |
+| **Skills** | 技能安装/卸载/启用/禁用，Git URL 安装 |
+| **Audit** | 审计日志查看、筛选、统计、清理 |
+| **Users** | RBAC 用户管理、角色分配 |
+| **Marketplace** | 私有市场浏览、发布、审批 |
+
+### 快捷命令
+
+| 命令 | 说明 |
+|------|------|
+| `/skills` | 列出已安装技能 |
+| `/workflows` | 列出可用工作流模板 |
 
 ---
 
@@ -185,12 +231,28 @@ omniagent/
 │   ├── cli.py                   # CLI 入口
 │   ├── core/
 │   │   ├── registry.py          # Agent 注册中心 + 能力匹配
-│   │   ├── orchestrator.py      # 任务编排器
+│   │   ├── orchestrator.py      # 任务编排器 + Skill 注入
+│   │   ├── analyzer.py          # 任务分析器
+│   │   ├── llm_bridge.py        # LLM 调用桥接
+│   │   ├── scorer.py            # Agent 评分系统
 │   │   └── workflow.py          # 工作流引擎
+│   ├── skills/
+│   │   ├── models.py            # Skill 数据模型
+│   │   ├── parser.py            # SKILL.md YAML 解析器
+│   │   ├── scanner.py           # 多路径技能扫描
+│   │   ├── registry.py          # 技能注册表
+│   │   ├── installer.py         # Git 技能安装器
+│   │   └── community.py         # 社区技能仓库
+│   ├── enterprise/
+│   │   ├── rbac.py              # 角色权限控制
+│   │   ├── audit.py             # SQLite 审计日志
+│   │   ├── marketplace.py       # 私有市场目录
+│   │   └── auth.py              # SSO/LDAP/OIDC 认证
 │   ├── runtime/
 │   │   ├── sandbox.py           # Agent 沙箱环境
 │   │   ├── pool.py              # LLM 连接池
-│   │   ├── executor.py          # 工具执行引擎
+│   │   ├── executor.py          # 工具执行引擎 + 文件锁
+│   │   ├── filelock.py          # 读写锁管理
 │   │   ├── stream.py            # 事件流
 │   │   └── security.py          # 权限系统
 │   ├── agents/
@@ -205,68 +267,41 @@ omniagent/
 │   │   └── builtin/             # 内置工具
 │   ├── collaboration/
 │   │   └── bus.py               # 协作消息总线
+│   ├── negotiation/
+│   │   └── protocol.py          # Agent 协商协议
 │   ├── gui/
-│   │   ├── app.py               # GUI 应用
-│   │   └── assets/              # 前端资源
+│   │   ├── app.py               # GUI 应用 + API 桥接
+│   │   └── assets/              # 前端资源 (HTML/CSS/JS)
 │   └── tui/
 │       ├── app.py               # TUI 应用
 │       ├── demo.py              # TUI 演示
 │       └── widgets/             # TUI 组件
-├── examples/                    # 示例演示
-├── tests/                       # 测试（41 个）
+├── tests/                       # 测试（233 个）
 ├── pyproject.toml               # 项目配置
 └── LICENSE                      # MIT
 ```
 
 ---
 
-## GUI 界面
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  🎯 OmniAgent Studio                       ⚙️  ─ □ ✕   │
-├────┬──────────────────────────────────┬──────────────────┤
-│ 📁 │  💬 对话区域                      │ 🤖 Agent 状态    │
-│ 🔍 │                                  │                  │
-│ ⟠  │  用户: Build a todo app…         │ ○ Orchestrator   │
-│ 🧩 │  🎯 Orchestrator: 分析中…         │ ○ CodeGen Agent  │
-│    │  ┌──────────────────────┐       │ ○ Review Agent   │
-│    │  │ ✅ 需求确认 → General │       │ ○ Doc Writer     │
-│    │  │ ✅ 需求分析 → Doc     │       │ ○ Test Agent     │
-│    │  │ ⚡ 原型设计 → CodeGen │       │                  │
-│    │  └──────────────────────┘       │                  │
-├────┴──────────────────────────────────┴──────────────────┤
-│  > 描述你的任务…                           🎤 📎 [↑]     │
-├──────────────────────────────────────────────────────────┤
-│  ● 就绪  │  Stage 3/7  │  v0.2.0  │  5 Agents           │
-└──────────────────────────────────────────────────────────┘
-```
-
-- **左侧图标栏**：文件浏览、搜索、Git、插件市场（后续开放）
-- **对话式主区域**：任务以聊天消息呈现，Pipeline 以卡片嵌入
-- **右侧 Agent 面板**：实时状态指示灯（idle/running/completed）
-- **底部输入栏**：支持多行输入，Enter 发送
-
----
-
 ## 开发状态
 
-当前版本: **v0.2.0-dev**
+当前版本: **v0.3.0-dev**
 
 | 模块 | 状态 |
 |------|------|
 | Protocol & Types | ✅ 完成 |
 | Agent Registry + Capability Matching | ✅ 完成 |
-| Orchestrator + TaskAnalyzer | ✅ 完成 |
-| Workflow Engine (3 workflows) | ✅ 完成 |
-| Collaboration Bus | ✅ 完成 |
+| Orchestrator + TaskAnalyzer + Workflow | ✅ 完成 |
+| Collaboration Bus + Negotiation Protocol | ✅ 完成 |
 | LLM Provider Layer (4 providers) | ✅ 完成 |
-| Agent Runtime (sandbox, pool, executor, stream) | ✅ 完成 |
+| Agent Runtime (sandbox, pool, executor, stream, filelock) | ✅ 完成 |
 | Permission System (Plan/Agent/Auto) | ✅ 完成 |
-| GUI Desktop Application | ✅ 完成 |
+| GUI Desktop Application (7-tab Settings) | ✅ 完成 |
 | TUI Terminal Dashboard | ✅ 完成 |
+| M4.2 Skill Ecosystem (SKILL.md, scanner, registry, installer) | ✅ 完成 |
+| M4.3 Enterprise (RBAC, Audit, Marketplace, Auth) | ✅ 完成 |
+| GUI Frontend-Backend Sync | ✅ 完成 |
 | Parallel Orchestration Engine | 🚧 进行中 |
-| Agent Marketplace | 📋 计划中 |
 
 ---
 
