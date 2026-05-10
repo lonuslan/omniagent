@@ -335,6 +335,10 @@ function openSettings() {
     loadModels();
     loadAgents();
     loadTools();
+    loadSkills();
+    loadAudit();
+    loadUsers();
+    loadMarketplace();
 }
 
 function closeSettings() {
@@ -478,6 +482,257 @@ async function loadTools() {
 function updateAgentDot(agentId, status) {
     const dot = document.getElementById(`ard-${agentId}`);
     if (dot) dot.className = `agent-dot${status === 'running' ? ' running' : ''}`;
+}
+
+// ── Skills Panel ────────────────────────────────────────────────────
+async function loadSkills() {
+    try {
+        const skills = await api('get_skills');
+        const list = document.getElementById('skill-list');
+        if (!Array.isArray(skills) || skills.length === 0) {
+            list.innerHTML = '<div class="empty-hint">No skills installed. Install from a Git URL above.</div>';
+            return;
+        }
+        list.innerHTML = skills.map(s => `
+            <div class="skill-row">
+                <div class="skill-header">
+                    <span class="skill-name">${escapeHtml(s.name || s.id)}</span>
+                    <span class="skill-version">v${escapeHtml(s.version || '?')}</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" ${s.enabled !== false ? 'checked' : ''} onchange="toggleSkill('${s.id}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="skill-desc">${escapeHtml(s.description || '')}</div>
+                <div class="skill-meta">
+                    ${(s.capabilities || []).map(c => `<span class="cap-tag">${escapeHtml(c)}</span>`).join('')}
+                    ${(s.tags || []).map(t => `<span class="tag-pill">${escapeHtml(t)}</span>`).join('')}
+                </div>
+                <div class="skill-actions">
+                    <button class="btn-danger-sm" onclick="uninstallSkill('${s.id}')">Uninstall</button>
+                </div>
+            </div>`).join('');
+    } catch (e) {
+        document.getElementById('skill-list').innerHTML = `<div class="empty-hint" style="color:var(--er)">${e.message}</div>`;
+    }
+}
+
+async function installSkill() {
+    const input = document.getElementById('skill-git-url');
+    const url = input.value.trim();
+    if (!url) return;
+    try {
+        const r = await api('install_skill', url);
+        if (r.status === 'ok') {
+            input.value = '';
+            loadSkills();
+        } else {
+            alert(r.message || 'Install failed');
+        }
+    } catch (e) { alert('Install failed: ' + e.message); }
+}
+
+async function uninstallSkill(id) {
+    if (!confirm(`Uninstall skill "${id}"?`)) return;
+    try {
+        await api('uninstall_skill', id);
+        loadSkills();
+    } catch (e) { /* ignore */ }
+}
+
+async function toggleSkill(id, enabled) {
+    try { await api('toggle_skill', id, enabled); } catch (e) { /* ignore */ }
+}
+
+// ── Audit Panel ─────────────────────────────────────────────────────
+async function loadAudit() {
+    try {
+        const stats = await api('get_audit_stats');
+        document.getElementById('audit-stats').innerHTML = `
+            <span class="stat-item"><strong>${stats.total_entries || 0}</strong> entries</span>
+            <span class="stat-item"><strong>${stats.total_errors || 0}</strong> errors</span>
+            <span class="stat-item">${((stats.error_rate || 0) * 100).toFixed(1)}% error rate</span>
+            ${(stats.top_tools || []).slice(0, 3).map(t =>
+                `<span class="stat-item">${escapeHtml(t.tool)}: ${t.count}</span>`
+            ).join('')}`;
+    } catch (e) { /* ignore */ }
+
+    try {
+        const timeFilter = document.getElementById('audit-time-filter').value;
+        const toolFilter = document.getElementById('audit-tool-filter').value.trim();
+        const errorOnly = document.getElementById('audit-error-filter').checked;
+        const now = Date.now() / 1000;
+        const filters = {};
+        if (timeFilter === 'today') filters.start_time = now - 86400;
+        else if (timeFilter === 'week') filters.start_time = now - 604800;
+        else if (timeFilter === 'month') filters.start_time = now - 2592000;
+        if (toolFilter) filters.tool_name = toolFilter;
+        if (errorOnly) filters.is_error = true;
+
+        const entries = await api('query_audit', JSON.stringify(filters));
+        const log = document.getElementById('audit-log');
+        if (!Array.isArray(entries) || entries.length === 0) {
+            log.innerHTML = '<div class="empty-hint">No audit entries found.</div>';
+            return;
+        }
+        log.innerHTML = `<table class="audit-table">
+            <thead><tr><th>Time</th><th>Tool</th><th>Agent</th><th>User</th><th>Duration</th><th>Status</th></tr></thead>
+            <tbody>${entries.map(e => `
+                <tr class="${e.is_error ? 'audit-error' : ''}">
+                    <td>${new Date(e.timestamp * 1000).toLocaleString()}</td>
+                    <td><code>${escapeHtml(e.tool_name)}</code></td>
+                    <td>${escapeHtml(e.agent_id)}</td>
+                    <td>${escapeHtml(e.user_id || '-')}</td>
+                    <td>${e.duration_ms.toFixed(1)}ms</td>
+                    <td>${e.is_error ? '<span class="status-err">Error</span>' : '<span class="status-ok">OK</span>'}</td>
+                </tr>`).join('')}</tbody></table>`;
+    } catch (e) {
+        document.getElementById('audit-log').innerHTML = `<div class="empty-hint" style="color:var(--er)">${e.message}</div>`;
+    }
+}
+
+async function purgeAudit() {
+    const days = prompt('Purge entries older than how many days?', '30');
+    if (!days) return;
+    const ts = (Date.now() / 1000) - (parseInt(days) * 86400);
+    try {
+        const r = await api('purge_audit', ts);
+        if (r.status === 'ok') {
+            alert(`Purged ${r.deleted} entries`);
+            loadAudit();
+        }
+    } catch (e) { alert('Purge failed: ' + e.message); }
+}
+
+// ── Users Panel ─────────────────────────────────────────────────────
+async function loadUsers() {
+    try {
+        const users = await api('get_users');
+        const list = document.getElementById('user-list');
+        if (!Array.isArray(users) || users.length === 0) {
+            list.innerHTML = '<div class="empty-hint">No users configured. Click "Add User" to create one.</div>';
+            return;
+        }
+        const roleColors = { admin: 'var(--er)', developer: 'var(--ac)', viewer: 'var(--tx3)' };
+        list.innerHTML = users.map(u => `
+            <div class="user-row">
+                <div class="user-info">
+                    <span class="user-name">${escapeHtml(u.display_name || u.username)}</span>
+                    <span class="role-badge" style="background:${roleColors[u.role] || 'var(--tx3)'}">${escapeHtml(u.role)}</span>
+                    <span class="user-email">${escapeHtml(u.email || '')}</span>
+                </div>
+                <div class="user-actions">
+                    <select class="toolbar-select-sm" onchange="updateUserRole('${u.id}', this.value)">
+                        <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                        <option value="developer" ${u.role === 'developer' ? 'selected' : ''}>Developer</option>
+                        <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                    </select>
+                    <button class="btn-danger-sm" onclick="deactivateUser('${u.id}')">Deactivate</button>
+                </div>
+            </div>`).join('');
+    } catch (e) {
+        document.getElementById('user-list').innerHTML = `<div class="empty-hint" style="color:var(--er)">${e.message}</div>`;
+    }
+}
+
+function showCreateUser() {
+    document.getElementById('create-user-form').classList.remove('hidden');
+}
+
+function hideCreateUser() {
+    document.getElementById('create-user-form').classList.add('hidden');
+}
+
+async function createUser() {
+    const username = document.getElementById('cu-username').value.trim();
+    const display = document.getElementById('cu-display').value.trim();
+    const email = document.getElementById('cu-email').value.trim();
+    const role = document.getElementById('cu-role').value;
+    if (!username) { alert('Username required'); return; }
+    try {
+        const r = await api('create_user', username, display || username, email, role);
+        if (r.status === 'ok') {
+            hideCreateUser();
+            document.getElementById('cu-username').value = '';
+            document.getElementById('cu-display').value = '';
+            document.getElementById('cu-email').value = '';
+            loadUsers();
+        } else { alert(r.message || 'Create failed'); }
+    } catch (e) { alert('Create failed: ' + e.message); }
+}
+
+async function updateUserRole(userId, newRole) {
+    try { await api('update_user_role', userId, newRole); } catch (e) { /* ignore */ }
+}
+
+async function deactivateUser(userId) {
+    if (!confirm('Deactivate this user?')) return;
+    try {
+        await api('deactivate_user', userId);
+        loadUsers();
+    } catch (e) { /* ignore */ }
+}
+
+// ── Marketplace Panel ───────────────────────────────────────────────
+async function loadMarketplace() {
+    try {
+        const query = document.getElementById('mp-query')?.value?.trim() || '';
+        const itemType = document.getElementById('mp-type-filter')?.value || '';
+        const entries = await api('search_marketplace', query, itemType);
+        const list = document.getElementById('marketplace-list');
+        if (!Array.isArray(entries) || entries.length === 0) {
+            list.innerHTML = '<div class="empty-hint">No marketplace items found.</div>';
+            return;
+        }
+        const statusColors = { active: 'var(--ok)', pending_review: 'var(--wn)', rejected: 'var(--er)' };
+        list.innerHTML = entries.map(e => `
+            <div class="mp-card">
+                <div class="mp-header">
+                    <span class="mp-name">${escapeHtml(e.name)}</span>
+                    <span class="mp-type-badge">${escapeHtml(e.item_type)}</span>
+                    <span class="mp-version">v${escapeHtml(e.version)}</span>
+                    <span class="mp-status" style="color:${statusColors[e.status] || 'var(--tx3)'}">${escapeHtml(e.status)}</span>
+                </div>
+                <div class="mp-desc">${escapeHtml(e.description || '')}</div>
+                <div class="mp-meta">
+                    <span>by ${escapeHtml(e.author || '?')}</span>
+                    <span>${e.install_count} installs</span>
+                    ${(e.capabilities || []).map(c => `<span class="cap-tag">${escapeHtml(c)}</span>`).join('')}
+                </div>
+                ${e.status === 'active' ? `<div class="mp-actions">
+                    <button class="btn-secondary-sm" onclick="mpSubmitReview('${e.item_id}', '${e.item_type}')">Submit for Review</button>
+                </div>` : ''}
+                ${e.status === 'pending_review' ? `<div class="mp-actions">
+                    <button class="btn-primary-sm" onclick="mpApprove('${e.item_id}', '${e.item_type}')">Approve</button>
+                    <button class="btn-danger-sm" onclick="mpReject('${e.item_id}', '${e.item_type}')">Reject</button>
+                </div>` : ''}
+            </div>`).join('');
+    } catch (e) {
+        document.getElementById('marketplace-list').innerHTML = `<div class="empty-hint" style="color:var(--er)">${e.message}</div>`;
+    }
+}
+
+async function mpSubmitReview(itemId, itemType) {
+    try {
+        await api('marketplace_submit_review', itemId, itemType, 'user');
+        loadMarketplace();
+    } catch (e) { /* ignore */ }
+}
+
+async function mpApprove(itemId, itemType) {
+    try {
+        await api('marketplace_approve', itemId, itemType, 'admin');
+        loadMarketplace();
+    } catch (e) { /* ignore */ }
+}
+
+async function mpReject(itemId, itemType) {
+    const reason = prompt('Rejection reason:', '');
+    if (reason === null) return;
+    try {
+        await api('marketplace_reject', itemId, itemType, 'admin', reason);
+        loadMarketplace();
+    } catch (e) { /* ignore */ }
 }
 
 // ── Status Bar ─────────────────────────────────────────────────────

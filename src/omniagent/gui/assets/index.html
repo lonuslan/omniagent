@@ -88,6 +88,10 @@
                 <button class="modal-tab active" data-tab="models">Models</button>
                 <button class="modal-tab" data-tab="agents">Agents</button>
                 <button class="modal-tab" data-tab="tools">Tools</button>
+                <button class="modal-tab" data-tab="skills">Skills</button>
+                <button class="modal-tab" data-tab="audit">Audit</button>
+                <button class="modal-tab" data-tab="users">Users</button>
+                <button class="modal-tab" data-tab="marketplace">Marketplace</button>
             </div>
             <div class="modal-body">
                 <div class="tab-panel active" id="tab-models">
@@ -99,6 +103,57 @@
                 </div>
                 <div class="tab-panel" id="tab-tools">
                     <div id="tool-list"></div>
+                </div>
+                <div class="tab-panel" id="tab-skills">
+                    <div class="panel-toolbar">
+                        <input type="text" id="skill-git-url" placeholder="Git URL to install skill..." class="toolbar-input">
+                        <button class="btn-primary" onclick="installSkill()">Install</button>
+                    </div>
+                    <div id="skill-list"></div>
+                </div>
+                <div class="tab-panel" id="tab-audit">
+                    <div id="audit-stats" class="stats-bar"></div>
+                    <div class="panel-toolbar">
+                        <select id="audit-time-filter" class="toolbar-select" onchange="loadAudit()">
+                            <option value="">All time</option>
+                            <option value="today">Today</option>
+                            <option value="week">This week</option>
+                            <option value="month">This month</option>
+                        </select>
+                        <input type="text" id="audit-tool-filter" placeholder="Tool name..." class="toolbar-input" onchange="loadAudit()">
+                        <label class="toolbar-check"><input type="checkbox" id="audit-error-filter" onchange="loadAudit()"> Errors only</label>
+                        <button class="btn-secondary" onclick="purgeAudit()">Purge old</button>
+                    </div>
+                    <div id="audit-log"></div>
+                </div>
+                <div class="tab-panel" id="tab-users">
+                    <div class="panel-toolbar">
+                        <button class="btn-primary" onclick="showCreateUser()">+ Add User</button>
+                    </div>
+                    <div id="create-user-form" class="inline-form hidden">
+                        <input type="text" id="cu-username" placeholder="Username" class="toolbar-input">
+                        <input type="text" id="cu-display" placeholder="Display name" class="toolbar-input">
+                        <input type="text" id="cu-email" placeholder="Email" class="toolbar-input">
+                        <select id="cu-role" class="toolbar-select">
+                            <option value="viewer">Viewer</option>
+                            <option value="developer">Developer</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                        <button class="btn-primary" onclick="createUser()">Create</button>
+                        <button class="btn-secondary" onclick="hideCreateUser()">Cancel</button>
+                    </div>
+                    <div id="user-list"></div>
+                </div>
+                <div class="tab-panel" id="tab-marketplace">
+                    <div class="panel-toolbar">
+                        <input type="text" id="mp-query" placeholder="Search marketplace..." class="toolbar-input" onchange="loadMarketplace()">
+                        <select id="mp-type-filter" class="toolbar-select" onchange="loadMarketplace()">
+                            <option value="">All types</option>
+                            <option value="agent">Agents</option>
+                            <option value="skill">Skills</option>
+                        </select>
+                    </div>
+                    <div id="marketplace-list"></div>
                 </div>
             </div>
         </div>

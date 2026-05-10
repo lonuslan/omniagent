@@ -209,6 +209,15 @@ class OmniAgentAPI:
         self._skill_registry.set_scanner(SkillScanner())
         self._skill_registry.discover()
         self._orchestrator.skill_registry = self._skill_registry
+        # Enterprise modules
+        from ..enterprise.rbac import RBACManager
+        from ..enterprise.audit import AuditStore
+        from ..enterprise.marketplace import PrivateMarketplace
+        from ..enterprise.auth import AuthManager
+        self._rbac = RBACManager()
+        self._audit_store = AuditStore()
+        self._marketplace = PrivateMarketplace()
+        self._auth = AuthManager(self._rbac)
 
     # ── Mode ────────────────────────────────────────────────────────────
 
@@ -931,6 +940,147 @@ class OmniAgentAPI:
             return json.dumps({"status": "ok", "results": results})
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
+
+    # ── Enterprise: RBAC ────────────────────────────────────────────────
+
+    def get_users(self) -> str:
+        """List all RBAC users."""
+        try:
+            users = self._rbac.list_users()
+            return json.dumps([u.to_dict() for u in users])
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def create_user(self, username: str, display_name: str, email: str, role: str) -> str:
+        """Create a new RBAC user."""
+        try:
+            from ..enterprise.rbac import Role
+            user = self._rbac.create_user(
+                username=username, display_name=display_name,
+                email=email, role=Role(role),
+            )
+            return json.dumps({"status": "ok", "user": user.to_dict()})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def update_user_role(self, user_id: str, new_role: str) -> str:
+        """Update a user's role."""
+        try:
+            from ..enterprise.rbac import Role
+            ok = self._rbac.update_user(user_id, role=Role(new_role))
+            return json.dumps({"status": "ok" if ok else "error"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def deactivate_user(self, user_id: str) -> str:
+        """Deactivate a user."""
+        try:
+            ok = self._rbac.deactivate_user(user_id)
+            return json.dumps({"status": "ok" if ok else "error"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    # ── Enterprise: Audit ───────────────────────────────────────────────
+
+    def query_audit(self, filters_json: str) -> str:
+        """Query audit log with filters."""
+        try:
+            f = json.loads(filters_json) if filters_json else {}
+            entries = self._audit_store.query(
+                start_time=f.get("start_time"),
+                end_time=f.get("end_time"),
+                tool_name=f.get("tool_name"),
+                user_id=f.get("user_id"),
+                is_error=f.get("is_error"),
+                limit=f.get("limit", 100),
+                offset=f.get("offset", 0),
+            )
+            return json.dumps([e.to_dict() for e in entries])
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def get_audit_stats(self) -> str:
+        """Return audit log aggregate statistics."""
+        try:
+            return json.dumps(self._audit_store.get_stats())
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def purge_audit(self, before_timestamp: float) -> str:
+        """Purge audit entries older than timestamp."""
+        try:
+            deleted = self._audit_store.purge_before(before_timestamp)
+            return json.dumps({"status": "ok", "deleted": deleted})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    # ── Enterprise: Marketplace ─────────────────────────────────────────
+
+    def search_marketplace(self, query: str = "", item_type: str = "") -> str:
+        """Search the private marketplace catalog."""
+        try:
+            entries = self._marketplace.search(
+                query=query, item_type=item_type or None, status=None,
+            )
+            return json.dumps([e.to_dict() for e in entries])
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def publish_to_marketplace(self, entry_json: str, published_by: str) -> str:
+        """Publish an item to the private marketplace."""
+        try:
+            from ..enterprise.marketplace import CatalogEntry
+            data = json.loads(entry_json)
+            entry = CatalogEntry.from_dict(data)
+            self._marketplace.publish(entry, published_by)
+            return json.dumps({"status": "ok"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def marketplace_submit_review(self, item_id: str, item_type: str, submitted_by: str) -> str:
+        """Submit a marketplace item for review."""
+        try:
+            self._marketplace.submit_for_review(item_id, item_type, submitted_by)
+            return json.dumps({"status": "ok"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def marketplace_approve(self, item_id: str, item_type: str, approved_by: str) -> str:
+        """Approve a marketplace item."""
+        try:
+            self._marketplace.approve(item_id, item_type, approved_by)
+            return json.dumps({"status": "ok"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def marketplace_reject(self, item_id: str, item_type: str, rejected_by: str, reason: str = "") -> str:
+        """Reject a marketplace item."""
+        try:
+            self._marketplace.reject(item_id, item_type, rejected_by, reason)
+            return json.dumps({"status": "ok"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    # ── Enterprise: Auth ────────────────────────────────────────────────
+
+    def get_auth_providers(self) -> str:
+        """List configured auth providers."""
+        return json.dumps(self._auth.list_providers())
+
+    def auth_login(self, username: str, password: str, provider: str = "mock") -> str:
+        """Login via auth provider."""
+        try:
+            token = self._auth.login(username, password, provider)
+            if token:
+                return json.dumps({"status": "ok", "token": token})
+            return json.dumps({"status": "error", "message": "Authentication failed"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def auth_logout(self, token: str) -> str:
+        """Logout and invalidate session."""
+        self._auth.logout(token)
+        return json.dumps({"status": "ok"})
 
 
 def get_assets_dir() -> Path:
